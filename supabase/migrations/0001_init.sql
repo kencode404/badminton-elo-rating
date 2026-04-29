@@ -313,6 +313,27 @@ alter table public.profiles enable row level security;
 alter table public.matches enable row level security;
 alter table public.match_participants enable row level security;
 
+-- Helper: SECURITY DEFINER membership check that bypasses RLS, so the
+-- match_participants SELECT policy can reference its own table without
+-- triggering 42P17 "infinite recursion in policy".
+create or replace function public.is_match_participant(
+  p_match_id uuid,
+  p_user_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.match_participants
+    where match_id = p_match_id and user_id = p_user_id
+  );
+$$;
+
+grant execute on function public.is_match_participant(uuid, uuid) to authenticated;
+
 -- Profiles: anyone signed in can read; only the owner can update their profile.
 drop policy if exists "Profiles readable by all signed-in users" on public.profiles;
 create policy "Profiles readable by all signed-in users"
@@ -340,10 +361,8 @@ create policy "Matches visible to participants"
   on public.matches for select
   to authenticated
   using (
-    auth.uid() = created_by or exists (
-      select 1 from public.match_participants
-      where match_id = matches.id and user_id = auth.uid()
-    )
+    auth.uid() = created_by
+    or public.is_match_participant(id, auth.uid())
   );
 
 drop policy if exists "Users can create matches as themselves" on public.matches;
@@ -362,10 +381,7 @@ create policy "Participants visible to involved users"
   to authenticated
   using (
     user_id = auth.uid()
-    or exists (
-      select 1 from public.match_participants mp2
-      where mp2.match_id = match_participants.match_id and mp2.user_id = auth.uid()
-    )
+    or public.is_match_participant(match_id, auth.uid())
     or exists (
       select 1 from public.matches m
       where m.id = match_participants.match_id and m.created_by = auth.uid()
