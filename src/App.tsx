@@ -5,12 +5,21 @@ import { LeaderboardPage } from './pages/LeaderboardPage';
 import { RecordMatchPage } from './pages/RecordMatchPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { SignInPage } from './pages/SignInPage';
+import { SignUpPage } from './pages/SignUpPage';
+import { RequireAuth } from './lib/auth';
 
 export function App() {
   return (
     <Routes>
       <Route path="/sign-in" element={<SignInPage />} />
-      <Route element={<AppShell />}>
+      <Route path="/sign-up" element={<SignUpPage />} />
+      <Route
+        element={
+          <RequireAuth>
+            <AppShell />
+          </RequireAuth>
+        }
+      >
         <Route path="/" element={<HomePage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/record" element={<RecordMatchPage />} />

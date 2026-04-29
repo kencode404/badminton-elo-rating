@@ -5,7 +5,15 @@
       "Bash(npm install *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5174/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5174/src/index.css)",
+      "Bash(curl -s -o /dev/null -w \"html %{http_code}\\\\n\" http://localhost:5175/)",
+      "Bash(curl -s -o /dev/null -w \"css %{http_code}\\\\n\" http://localhost:5175/src/index.css)",
+      "Bash(curl -s -o /dev/null -w \"html %{http_code}\\\\n\" http://localhost:5176/)",
+      "Bash(curl -s -o /dev/null -w \"css %{http_code}\\\\n\" http://localhost:5176/src/index.css)",
+      "Bash(curl -s -o /dev/null -w \"html %{http_code}\\\\n\" http://localhost:5176/sign-in)"
     ]
   }
 }

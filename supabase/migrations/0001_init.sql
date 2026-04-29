@@ -1,22 +1,37 @@
 -- Badminton ELO — initial schema
--- Run this in the Supabase SQL editor for your project.
+-- Run this in the Supabase SQL editor for your project. Safe to rerun.
 -- Constants (K-factor, starting rating, expiry days) are kept in sync with
 -- src/lib/elo.ts and docs/ELO_CALCULATION.md.
 
 -- =========================================================================
--- 1. Enums
+-- 1. Enums (idempotent)
 -- =========================================================================
 
-create type match_type as enum ('singles', 'doubles');
-create type match_status as enum ('pending', 'confirmed', 'rejected', 'expired');
-create type match_team as enum ('A', 'B');
-create type confirmation_status as enum ('pending', 'accepted', 'rejected');
+do $$ begin
+  create type match_type as enum ('singles', 'doubles');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type match_status as enum ('pending', 'confirmed', 'rejected', 'expired');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type match_team as enum ('A', 'B');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type confirmation_status as enum ('pending', 'accepted', 'rejected');
+exception when duplicate_object then null;
+end $$;
 
 -- =========================================================================
 -- 2. Profiles (one row per auth.users entry)
 -- =========================================================================
 
-create table public.profiles (
+create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text not null check (char_length(display_name) between 1 and 40),
   avatar_url text,
@@ -27,8 +42,8 @@ create table public.profiles (
   created_at timestamptz not null default now()
 );
 
-create index profiles_singles_rating_idx on public.profiles (singles_rating desc);
-create index profiles_doubles_rating_idx on public.profiles (doubles_rating desc);
+create index if not exists profiles_singles_rating_idx on public.profiles (singles_rating desc);
+create index if not exists profiles_doubles_rating_idx on public.profiles (doubles_rating desc);
 
 -- Auto-create profile row when a new auth user signs up.
 create or replace function public.handle_new_user()
@@ -47,6 +62,7 @@ begin
 end;
 $$;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
@@ -55,7 +71,7 @@ create trigger on_auth_user_created
 -- 3. Matches & participants
 -- =========================================================================
 
-create table public.matches (
+create table if not exists public.matches (
   id uuid primary key default gen_random_uuid(),
   match_type match_type not null,
   created_by uuid not null references public.profiles(id) on delete cascade,
@@ -69,11 +85,11 @@ create table public.matches (
   check (score_a <> score_b)  -- no ties
 );
 
-create index matches_status_idx on public.matches (status);
-create index matches_played_at_idx on public.matches (played_at desc);
-create index matches_expires_at_idx on public.matches (expires_at) where status = 'pending';
+create index if not exists matches_status_idx on public.matches (status);
+create index if not exists matches_played_at_idx on public.matches (played_at desc);
+create index if not exists matches_expires_at_idx on public.matches (expires_at) where status = 'pending';
 
-create table public.match_participants (
+create table if not exists public.match_participants (
   match_id uuid not null references public.matches(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
   team match_team not null,
@@ -85,7 +101,7 @@ create table public.match_participants (
   primary key (match_id, user_id)
 );
 
-create index match_participants_user_pending_idx
+create index if not exists match_participants_user_pending_idx
   on public.match_participants (user_id)
   where confirmation = 'pending';
 
@@ -126,6 +142,7 @@ begin
 end;
 $$;
 
+drop trigger if exists trg_validate_match_participants on public.match_participants;
 create trigger trg_validate_match_participants
   after insert on public.match_participants
   for each row execute function public.validate_match_participants();
@@ -283,6 +300,7 @@ begin
 end;
 $$;
 
+drop trigger if exists trg_handle_confirmation_change on public.match_participants;
 create trigger trg_handle_confirmation_change
   after update of confirmation on public.match_participants
   for each row execute function public.handle_confirmation_change();
@@ -296,11 +314,13 @@ alter table public.matches enable row level security;
 alter table public.match_participants enable row level security;
 
 -- Profiles: anyone signed in can read; only the owner can update their profile.
+drop policy if exists "Profiles readable by all signed-in users" on public.profiles;
 create policy "Profiles readable by all signed-in users"
   on public.profiles for select
   to authenticated
   using (true);
 
+drop policy if exists "Users can update own profile" on public.profiles;
 create policy "Users can update own profile"
   on public.profiles for update
   to authenticated
@@ -315,6 +335,7 @@ create policy "Users can update own profile"
 -- Read: any participant or the creator.
 -- Insert: must be the creator and a participant.
 -- Update: only the creator can cancel a still-pending match (handled later).
+drop policy if exists "Matches visible to participants" on public.matches;
 create policy "Matches visible to participants"
   on public.matches for select
   to authenticated
@@ -325,6 +346,7 @@ create policy "Matches visible to participants"
     )
   );
 
+drop policy if exists "Users can create matches as themselves" on public.matches;
 create policy "Users can create matches as themselves"
   on public.matches for insert
   to authenticated
@@ -334,6 +356,7 @@ create policy "Users can create matches as themselves"
 -- Read: any signed-in user can read participants of matches they are in or created.
 -- Insert: creator of the match adds participants at match-creation time.
 -- Update: a user can only update their own confirmation.
+drop policy if exists "Participants visible to involved users" on public.match_participants;
 create policy "Participants visible to involved users"
   on public.match_participants for select
   to authenticated
@@ -349,6 +372,7 @@ create policy "Participants visible to involved users"
     )
   );
 
+drop policy if exists "Match creator inserts participants" on public.match_participants;
 create policy "Match creator inserts participants"
   on public.match_participants for insert
   to authenticated
@@ -359,6 +383,7 @@ create policy "Match creator inserts participants"
     )
   );
 
+drop policy if exists "Users update only own confirmation" on public.match_participants;
 create policy "Users update only own confirmation"
   on public.match_participants for update
   to authenticated
@@ -369,9 +394,16 @@ create policy "Users update only own confirmation"
 -- 7. Realtime
 -- =========================================================================
 
--- Allow Realtime to broadcast inserts/updates on these tables.
-alter publication supabase_realtime add table public.matches;
-alter publication supabase_realtime add table public.match_participants;
+-- Allow Realtime to broadcast inserts/updates on these tables (idempotent).
+do $$ begin
+  alter publication supabase_realtime add table public.matches;
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  alter publication supabase_realtime add table public.match_participants;
+exception when duplicate_object then null;
+end $$;
 
 -- =========================================================================
 -- 8. Match expiry job (call from a scheduled edge function or pg_cron)

@@ -1,35 +1,58 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 
-export function SignInPage() {
-  const { signInWithPassword, signInWithGoogle } = useAuth();
+export function SignUpPage() {
+  const { signUpWithPassword, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  const redirectTo = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/';
+  const [needsEmailConfirm, setNeedsEmailConfirm] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
-    const { error } = await signInWithPassword(email, password);
+    const { error, needsEmailConfirm } = await signUpWithPassword(email, password, displayName);
     setSubmitting(false);
     if (error) {
       setError(error);
       return;
     }
-    navigate(redirectTo, { replace: true });
+    if (needsEmailConfirm) {
+      setNeedsEmailConfirm(true);
+      return;
+    }
+    navigate('/', { replace: true });
   }
 
   async function onGoogle() {
     setError(null);
     const { error } = await signInWithGoogle();
     if (error) setError(error);
+  }
+
+  if (needsEmailConfirm) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center p-6 cosmic-bg starfield relative">
+        <div className="relative w-full max-w-sm glass-panel p-7 text-center">
+          <div className="text-3xl mb-3 text-cyan2-400" aria-hidden>✉</div>
+          <h1 className="font-display tracking-[0.2em] text-base text-zinc-900 dark:text-zinc-100 uppercase">
+            Check your email
+          </h1>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
+            We sent a confirmation link to <span className="font-semibold text-zinc-900 dark:text-zinc-100">{email}</span>.
+            Click it to activate your account, then come back and sign in.
+          </p>
+          <Link to="/sign-in" className="cosmic-button-ghost w-full text-sm mt-5 inline-flex">
+            Back to sign in
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -47,14 +70,24 @@ export function SignInPage() {
             ◆
           </div>
           <h1 className="font-display tracking-[0.2em] text-base text-zinc-900 dark:text-zinc-100 mt-4 uppercase">
-            Sign In
+            Create Account
           </h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 uppercase tracking-widest">
-            Authenticate to continue
+            Join the club
           </p>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-3">
+          <Field
+            label="Display Name"
+            type="text"
+            value={displayName}
+            onChange={setDisplayName}
+            autoComplete="nickname"
+            required
+            minLength={1}
+            maxLength={40}
+          />
           <Field
             label="Email"
             type="email"
@@ -68,7 +101,7 @@ export function SignInPage() {
             type="password"
             value={password}
             onChange={setPassword}
-            autoComplete="current-password"
+            autoComplete="new-password"
             required
             minLength={6}
           />
@@ -84,7 +117,7 @@ export function SignInPage() {
             disabled={submitting}
             className="cosmic-button w-full"
           >
-            {submitting ? 'Signing in…' : 'Sign in'}
+            {submitting ? 'Creating account…' : 'Create account'}
           </button>
         </form>
 
@@ -100,9 +133,9 @@ export function SignInPage() {
         </button>
 
         <p className="text-xs text-zinc-500 dark:text-zinc-500 text-center mt-5">
-          Don't have an account?{' '}
-          <Link to="/sign-up" className="text-cyan2-500 dark:text-cyan2-300 font-semibold">
-            Sign up
+          Already have an account?{' '}
+          <Link to="/sign-in" className="text-cyan2-500 dark:text-cyan2-300 font-semibold">
+            Sign in
           </Link>
         </p>
       </div>

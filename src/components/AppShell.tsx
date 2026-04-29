@@ -3,63 +3,70 @@ import { ThemeToggle } from './ThemeToggle';
 import { NotificationBell } from './NotificationBell';
 
 const navItems = [
-  { to: '/', label: 'Home', icon: 'home' },
-  { to: '/leaderboard', label: 'Ranks', icon: 'trophy' },
-  { to: '/record', label: 'Record', icon: 'plus' },
-  { to: '/profile', label: 'Profile', icon: 'user' },
+  { to: '/', label: 'Home', glyph: '◆' },
+  { to: '/leaderboard', label: 'Ranks', glyph: '✦' },
+  { to: '/record', label: 'Record', glyph: '◈' },
+  { to: '/profile', label: 'Profile', glyph: '✧' },
 ];
 
 export function AppShell() {
   return (
-    <div className="min-h-dvh flex flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-court-700 dark:bg-court-900 text-white shadow-md">
-        <h1 className="font-bold tracking-wide">Badminton ELO</h1>
-        <div className="flex items-center gap-2">
-          <NotificationBell />
-          <ThemeToggle />
+    <div className="min-h-dvh flex flex-col cosmic-bg starfield">
+      <header className="sticky top-0 z-10 px-4 py-3 bg-white/80 dark:bg-[#0a0a0c]/85 backdrop-blur-sm border-b border-zinc-200 dark:border-zinc-800">
+        <div className="flex items-center justify-between">
+          <h1 className="font-display tracking-[0.2em] text-base flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+            <span aria-hidden className="text-cyan2-500 dark:text-cyan2-300">◆</span>
+            <span>BADMINTON ELO</span>
+          </h1>
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 court-bg pb-20">
+      <main className="flex-1 pb-24 relative z-0">
         <Outlet />
       </main>
 
-      <nav className="fixed bottom-0 inset-x-0 grid grid-cols-4 border-t border-court-200 dark:border-court-800 bg-white/90 dark:bg-shuttle-dark/90 backdrop-blur">
+      <nav
+        className="fixed bottom-3 inset-x-3 grid grid-cols-4 glass-panel overflow-hidden"
+        aria-label="Bottom navigation"
+      >
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.to === '/'}
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center py-3 text-xs ${
+              `relative flex flex-col items-center justify-center py-2.5 text-[11px] font-semibold tracking-wide transition ${
                 isActive
-                  ? 'text-court-700 dark:text-court-500 font-semibold'
-                  : 'text-gray-500 dark:text-gray-400'
+                  ? 'text-cyan2-500 dark:text-cyan2-300'
+                  : 'text-zinc-500 dark:text-zinc-400'
               }`
             }
           >
-            <span className="text-lg" aria-hidden>
-              {iconFor(item.icon)}
-            </span>
-            {item.label}
+            {({ isActive }) => (
+              <>
+                {isActive && (
+                  <span
+                    className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-cyan2-400"
+                    style={{ boxShadow: '0 0 8px rgba(34, 211, 238, 0.7)' }}
+                    aria-hidden
+                  />
+                )}
+                <span
+                  className={`text-lg mb-0.5 ${isActive ? 'text-cyan2-400' : ''}`}
+                  aria-hidden
+                >
+                  {item.glyph}
+                </span>
+                <span className="uppercase text-[10px]">{item.label}</span>
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
     </div>
   );
-}
-
-function iconFor(name: string): string {
-  switch (name) {
-    case 'home':
-      return '\u{1F3E0}';
-    case 'trophy':
-      return '\u{1F3C6}';
-    case 'plus':
-      return '➕';
-    case 'user':
-      return '\u{1F464}';
-    default:
-      return '';
-  }
 }
