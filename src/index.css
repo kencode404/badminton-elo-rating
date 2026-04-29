@@ -14,6 +14,7 @@
     @apply min-h-dvh antialiased;
     width: 100%;
     overflow-x: hidden;
+    touch-action: manipulation;
   }
   #root {
     width: 100%;
