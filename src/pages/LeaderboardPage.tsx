@@ -1,9 +1,40 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useAuth } from '../lib/auth';
+import { supabase } from '../lib/supabase';
+import { formatError } from '../lib/errors';
+import type { Database } from '../lib/database.types';
 
 type Tab = 'singles' | 'doubles';
+type Profile = Database['public']['Tables']['profiles']['Row'];
 
 export function LeaderboardPage() {
+  const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('singles');
+  const [rows, setRows] = useState<Profile[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setRows(null);
+    setError(null);
+    const ratingCol = tab === 'singles' ? 'singles_rating' : 'doubles_rating';
+    const gamesCol = tab === 'singles' ? 'singles_games_played' : 'doubles_games_played';
+    supabase
+      .from('profiles')
+      .select('*')
+      .order(ratingCol, { ascending: false })
+      .order(gamesCol, { ascending: false })
+      .order('display_name', { ascending: true })
+      .limit(100)
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) setError(formatError(error));
+        else setRows(data ?? []);
+      });
+    return () => {
+      active = false;
+    };
+  }, [tab]);
 
   return (
     <div className="p-4 space-y-4">
@@ -25,16 +56,106 @@ export function LeaderboardPage() {
         ))}
       </div>
 
-      <ol className="space-y-2">
-        <li className="glass-panel p-6 text-center">
-          <div className="text-3xl mb-2 text-cyan2-400" aria-hidden>
-            ✦
-          </div>
+      {error && (
+        <div className="text-xs text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/40 rounded-md px-3 py-2">
+          {error}
+        </div>
+      )}
+
+      {rows === null ? (
+        <p className="text-sm text-zinc-500 dark:text-zinc-500">Loading…</p>
+      ) : rows.length === 0 ? (
+        <section className="glass-panel p-6 text-center">
+          <div className="text-3xl mb-2 text-cyan2-400" aria-hidden>✦</div>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            No combatants registered. Once members sign up, rankings will appear here.
+            No players yet. Once members sign up, rankings will appear here.
           </p>
-        </li>
-      </ol>
+        </section>
+      ) : (
+        <ol className="space-y-2">
+          {rows.map((p, i) => (
+            <Row
+              key={p.id}
+              rank={i + 1}
+              profile={p}
+              tab={tab}
+              isMe={user?.id === p.id}
+            />
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+function Row({
+  rank,
+  profile,
+  tab,
+  isMe,
+}: {
+  rank: number;
+  profile: Profile;
+  tab: Tab;
+  isMe: boolean;
+}) {
+  const rating = tab === 'singles' ? profile.singles_rating : profile.doubles_rating;
+  const games = tab === 'singles' ? profile.singles_games_played : profile.doubles_games_played;
+  const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null;
+
+  return (
+    <li
+      className={`glass-panel p-3 flex items-center gap-3 ${
+        isMe ? 'ring-1 ring-cyan2-400/60' : ''
+      }`}
+    >
+      <div className="w-7 text-center font-display text-sm text-zinc-500 dark:text-zinc-400 shrink-0">
+        {medal ?? `#${rank}`}
+      </div>
+
+      <Avatar profile={profile} />
+
+      <div className="flex-1 min-w-0">
+        <div
+          className={`text-sm truncate ${
+            isMe
+              ? 'font-display tracking-wide uppercase text-cyan2-600 dark:text-cyan2-300'
+              : 'text-zinc-900 dark:text-zinc-100'
+          }`}
+        >
+          {profile.display_name}
+          {isMe && <span className="text-[9px] tracking-widest ml-1">· you</span>}
+        </div>
+        <div className="text-[10px] text-zinc-500 dark:text-zinc-500 tracking-wider uppercase">
+          {games} {games === 1 ? 'game' : 'games'}
+        </div>
+      </div>
+
+      <div className="text-right shrink-0">
+        <div className="font-display text-lg leading-none text-zinc-900 dark:text-zinc-100">
+          {rating}
+        </div>
+        <div className="text-[9px] text-zinc-500 dark:text-zinc-500 tracking-widest uppercase mt-0.5">
+          Rating
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function Avatar({ profile }: { profile: Profile }) {
+  if (profile.avatar_url) {
+    return (
+      <img
+        src={profile.avatar_url}
+        alt=""
+        className="w-9 h-9 rounded-full object-cover border border-zinc-200 dark:border-zinc-700 shrink-0"
+      />
+    );
+  }
+  return (
+    <div className="w-9 h-9 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center font-semibold shrink-0">
+      {profile.display_name?.[0]?.toUpperCase() ?? '?'}
     </div>
   );
 }
