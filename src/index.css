@@ -5,9 +5,19 @@
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    width: 100%;
+    overflow-x: hidden;
   }
   body {
     @apply min-h-dvh antialiased;
+    width: 100%;
+    overflow-x: hidden;
+  }
+  #root {
+    width: 100%;
+    overflow-x: hidden;
   }
 }
 

@@ -12,7 +12,10 @@ const navItems = [
 export function AppShell() {
   return (
     <div className="min-h-dvh flex flex-col cosmic-bg starfield">
-      <header className="sticky top-0 z-10 px-4 py-3 bg-white/80 dark:bg-[#0a0a0c]/85 backdrop-blur-sm border-b border-zinc-200 dark:border-zinc-800">
+      <header
+        className="sticky top-0 z-10 px-4 pb-3 bg-white/80 dark:bg-[#0a0a0c]/85 backdrop-blur-sm border-b border-zinc-200 dark:border-zinc-800"
+        style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
+      >
         <div className="flex items-center justify-between">
           <h1 className="font-display tracking-[0.2em] text-base flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
             <span aria-hidden className="text-cyan2-500 dark:text-cyan2-300">◆</span>
@@ -30,7 +33,8 @@ export function AppShell() {
       </main>
 
       <nav
-        className="fixed bottom-3 inset-x-3 grid grid-cols-4 glass-panel overflow-hidden"
+        className="fixed inset-x-3 grid grid-cols-4 glass-panel overflow-hidden"
+        style={{ bottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
         aria-label="Bottom navigation"
       >
         {navItems.map((item) => (
