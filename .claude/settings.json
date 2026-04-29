@@ -13,7 +13,9 @@
       "Bash(curl -s -o /dev/null -w \"css %{http_code}\\\\n\" http://localhost:5175/src/index.css)",
       "Bash(curl -s -o /dev/null -w \"html %{http_code}\\\\n\" http://localhost:5176/)",
       "Bash(curl -s -o /dev/null -w \"css %{http_code}\\\\n\" http://localhost:5176/src/index.css)",
-      "Bash(curl -s -o /dev/null -w \"html %{http_code}\\\\n\" http://localhost:5176/sign-in)"
+      "Bash(curl -s -o /dev/null -w \"html %{http_code}\\\\n\" http://localhost:5176/sign-in)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:5176/src/pages/ProfilePage.tsx?t=$\\(date +%s\\)\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:5176/src/lib/image.ts?t=$\\(date +%s\\)\")"
     ]
   }
 }

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
+import { AvatarCropModal } from '../components/AvatarCropModal';
 import type { Database } from '../lib/database.types';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -10,6 +11,14 @@ export function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const [savingName, setSavingName] = useState(false);
+
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -31,6 +40,72 @@ export function ProfilePage() {
     };
   }, [user]);
 
+  async function saveName() {
+    if (!user || !profile) return;
+    const trimmed = nameDraft.trim();
+    if (!trimmed || trimmed === profile.display_name) {
+      setEditingName(false);
+      return;
+    }
+    setSavingName(true);
+    setError(null);
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ display_name: trimmed })
+      .eq('id', user.id)
+      .select()
+      .maybeSingle();
+    setSavingName(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    if (data) setProfile(data);
+    setEditingName(false);
+  }
+
+  function onFileSelected(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file
+    if (!file) return;
+    setError(null);
+    setPendingFile(file);
+  }
+
+  async function uploadCroppedBlob(blob: Blob) {
+    if (!user) return;
+    setUploadingAvatar(true);
+    setError(null);
+    try {
+      const path = `${user.id}/avatar.jpg`;
+      const { error: uploadErr } = await supabase.storage
+        .from('avatars')
+        .upload(path, blob, {
+          contentType: 'image/jpeg',
+          upsert: true,
+          cacheControl: '3600',
+        });
+      if (uploadErr) throw uploadErr;
+
+      const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+      const url = `${pub.publicUrl}?v=${Date.now()}`;
+
+      const { data, error: updateErr } = await supabase
+        .from('profiles')
+        .update({ avatar_url: url })
+        .eq('id', user.id)
+        .select()
+        .maybeSingle();
+      if (updateErr) throw updateErr;
+      if (data) setProfile(data);
+      setPendingFile(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
   const displayName =
     profile?.display_name ??
     (user?.user_metadata?.display_name as string | undefined) ??
@@ -39,28 +114,100 @@ export function ProfilePage() {
 
   return (
     <div className="p-4 space-y-4">
-      <section className="glass-panel p-6 text-center relative overflow-hidden">
-        <div
-          className="mx-auto w-20 h-20 rounded-2xl flex items-center justify-center text-3xl text-white border border-cyan2-400/40"
+      <section className="glass-panel p-6 text-center">
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploadingAvatar}
+          className="relative mx-auto block w-24 h-24 rounded-2xl overflow-hidden border border-cyan2-400/40 group"
           style={{
             background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)',
             boxShadow: '0 0 18px rgba(34, 211, 238, 0.4)',
           }}
+          aria-label="Change avatar"
         >
-          ◆
-        </div>
-        <h2 className="font-display tracking-[0.2em] text-base text-zinc-900 dark:text-zinc-100 mt-4 uppercase">
-          {displayName}
-        </h2>
+          {profile?.avatar_url ? (
+            <img
+              src={profile.avatar_url}
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <span className="flex items-center justify-center w-full h-full text-3xl text-white" aria-hidden>
+              ◆
+            </span>
+          )}
+          <span
+            className="absolute inset-0 bg-black/55 text-white text-[10px] uppercase tracking-widest font-display flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+          >
+            Change
+          </span>
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={onFileSelected}
+        />
+
+        {editingName ? (
+          <div className="mt-4 flex flex-col gap-2 max-w-xs mx-auto">
+            <input
+              autoFocus
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              maxLength={40}
+              className="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-center text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-cyan2-400 focus:ring-1 focus:ring-cyan2-400/40"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={saveName}
+                disabled={savingName}
+                className="cosmic-button flex-1 text-xs"
+              >
+                {savingName ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingName(false)}
+                className="cosmic-button-ghost flex-1 text-xs"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setNameDraft(profile?.display_name ?? displayName);
+              setEditingName(true);
+            }}
+            className="mt-4 inline-flex items-center gap-2 group"
+          >
+            <h2 className="font-display tracking-[0.2em] text-base text-zinc-900 dark:text-zinc-100 uppercase">
+              {displayName}
+            </h2>
+            <span className="text-cyan2-500 dark:text-cyan2-300 text-xs opacity-60 group-hover:opacity-100 transition" aria-hidden>
+              ✎
+            </span>
+          </button>
+        )}
         <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1">{user?.email}</p>
       </section>
+
+      {error && (
+        <div className="text-xs text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/40 rounded-md px-3 py-2">
+          {error}
+        </div>
+      )}
 
       <section className="glass-panel p-5">
         <div className="section-title mb-3">Ratings</div>
         {loading ? (
           <p className="text-sm text-zinc-500 dark:text-zinc-500">Loading…</p>
-        ) : error ? (
-          <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
         ) : profile ? (
           <div className="grid grid-cols-2 gap-3">
             <Stat label="Singles" rating={profile.singles_rating} games={profile.singles_games_played} />
@@ -87,6 +234,15 @@ export function ProfilePage() {
       >
         Sign out
       </button>
+
+      {pendingFile && (
+        <AvatarCropModal
+          file={pendingFile}
+          onCancel={() => setPendingFile(null)}
+          onConfirm={uploadCroppedBlob}
+          saving={uploadingAvatar}
+        />
+      )}
     </div>
   );
 }
