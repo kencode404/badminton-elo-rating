@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply min-h-dvh antialiased;
+  }
+}
+
+@layer components {
+  .court-bg {
+    background-image:
+      linear-gradient(0deg, transparent 24%, rgba(255, 255, 255, 0.04) 25%, rgba(255, 255, 255, 0.04) 26%, transparent 27%, transparent 74%, rgba(255, 255, 255, 0.04) 75%, rgba(255, 255, 255, 0.04) 76%, transparent 77%),
+      linear-gradient(90deg, transparent 24%, rgba(255, 255, 255, 0.04) 25%, rgba(255, 255, 255, 0.04) 26%, transparent 27%, transparent 74%, rgba(255, 255, 255, 0.04) 75%, rgba(255, 255, 255, 0.04) 76%, transparent 77%);
+    background-size: 64px 64px;
+  }
+}
