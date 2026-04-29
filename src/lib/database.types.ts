@@ -29,7 +29,14 @@ export interface Database {
           singles_games_played?: number;
           doubles_games_played?: number;
         };
-        Update: Partial<Database['public']['Tables']['profiles']['Insert']>;
+        Update: {
+          display_name?: string;
+          avatar_url?: string | null;
+          singles_rating?: number;
+          doubles_rating?: number;
+          singles_games_played?: number;
+          doubles_games_played?: number;
+        };
         Relationships: [];
       };
       matches: {
@@ -53,8 +60,17 @@ export interface Database {
           score_b: number;
           status?: MatchStatus;
           played_at?: string;
+          expires_at?: string;
+          elo_version?: number;
         };
-        Update: Partial<Database['public']['Tables']['matches']['Insert']>;
+        Update: {
+          match_type?: MatchType;
+          score_a?: number;
+          score_b?: number;
+          status?: MatchStatus;
+          confirmed_at?: string | null;
+          expires_at?: string;
+        };
         Relationships: [];
       };
       match_participants: {
@@ -74,7 +90,13 @@ export interface Database {
           team: Team;
           confirmation?: Confirmation;
         };
-        Update: Partial<Database['public']['Tables']['match_participants']['Insert']>;
+        Update: {
+          confirmation?: Confirmation;
+          responded_at?: string | null;
+          rating_before?: number | null;
+          rating_after?: number | null;
+          rating_delta?: number | null;
+        };
         Relationships: [];
       };
     };
