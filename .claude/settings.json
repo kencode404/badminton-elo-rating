@@ -17,7 +17,8 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:5176/src/pages/ProfilePage.tsx?t=$\\(date +%s\\)\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:5176/src/lib/image.ts?t=$\\(date +%s\\)\")",
       "Bash(npx tsc *)",
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "Bash(git rm *)"
     ]
   }
 }
