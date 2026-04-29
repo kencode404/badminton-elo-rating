@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { getPendingForUser, respondToMatch, type PendingMatchSummary } from '../lib/matches';
+import { formatError } from '../lib/errors';
 import type { Database } from '../lib/database.types';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -20,7 +21,7 @@ export function HomePage() {
       const list = await getPendingForUser(user.id);
       setPending(list);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load matches');
+      setError(formatError(err));
     }
   }, [user]);
 
@@ -49,7 +50,7 @@ export function HomePage() {
       await respondToMatch(matchId, user.id, decision);
       await loadPending();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to respond');
+      setError(formatError(err));
     } finally {
       setBusyId(null);
     }
