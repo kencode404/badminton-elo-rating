@@ -30,6 +30,7 @@ export interface Database {
           doubles_games_played?: number;
         };
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>;
+        Relationships: [];
       };
       matches: {
         Row: {
@@ -54,6 +55,7 @@ export interface Database {
           played_at?: string;
         };
         Update: Partial<Database['public']['Tables']['matches']['Insert']>;
+        Relationships: [];
       };
       match_participants: {
         Row: {
@@ -73,7 +75,17 @@ export interface Database {
           confirmation?: Confirmation;
         };
         Update: Partial<Database['public']['Tables']['match_participants']['Insert']>;
+        Relationships: [];
       };
     };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: {
+      match_type: MatchType;
+      match_status: MatchStatus;
+      match_team: Team;
+      confirmation_status: Confirmation;
+    };
+    CompositeTypes: Record<string, never>;
   };
 }
