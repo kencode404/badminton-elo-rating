@@ -206,7 +206,7 @@ begin
     'select avg(p.%I)::numeric
        from public.match_participants mp
        join public.profiles p on p.id = mp.user_id
-      where mp.match_id = $1 and mp.team = $2',
+      where mp.match_id = $1 and mp.team = $2::match_team',
     rating_col
   ) using p_match_id, 'A' into rating_a;
 
@@ -214,7 +214,7 @@ begin
     'select avg(p.%I)::numeric
        from public.match_participants mp
        join public.profiles p on p.id = mp.user_id
-      where mp.match_id = $1 and mp.team = $2',
+      where mp.match_id = $1 and mp.team = $2::match_team',
     rating_col
   ) using p_match_id, 'B' into rating_b;
 
