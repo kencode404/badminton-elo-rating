@@ -1,4 +1,58 @@
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
+import type { Database, MatchType } from '../lib/database.types';
+
+interface AnnouncementRow {
+  id: string;
+  user_id: string;
+  match_type: MatchType;
+  streak_count: number;
+  created_at: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
 export function HomePage() {
+  const [announcements, setAnnouncements] = useState<AnnouncementRow[] | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    supabase
+      .from('streak_announcements')
+      .select('id, user_id, match_type, streak_count, created_at, profiles:user_id(display_name, avatar_url)')
+      .gt('expires_at', new Date().toISOString())
+      .order('streak_count', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        if (!active) return;
+        type Joined = {
+          id: string;
+          user_id: string;
+          match_type: MatchType;
+          streak_count: number;
+          created_at: string;
+          profiles: Pick<
+            Database['public']['Tables']['profiles']['Row'],
+            'display_name' | 'avatar_url'
+          > | null;
+        };
+        const flattened = ((data ?? []) as unknown as Joined[]).map((r) => ({
+          id: r.id,
+          user_id: r.user_id,
+          match_type: r.match_type,
+          streak_count: r.streak_count,
+          created_at: r.created_at,
+          display_name: r.profiles?.display_name ?? 'Player',
+          avatar_url: r.profiles?.avatar_url ?? null,
+        }));
+        setAnnouncements(flattened);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="p-4 space-y-4">
       <section className="glass-panel p-5 relative overflow-hidden">
@@ -13,6 +67,103 @@ export function HomePage() {
           confirmation, and ascend the leaderboard.
         </p>
       </section>
+
+      {announcements && announcements.length > 0 && (
+        <section className="glass-panel p-5">
+          <div className="section-title mb-3">On A Streak</div>
+          <ul className="space-y-2">
+            {announcements.map((a) => (
+              <AnnouncementItem key={a.id} a={a} />
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
+}
+
+function AnnouncementItem({ a }: { a: AnnouncementRow }) {
+  const challenge = a.streak_count >= 3;
+  const message = challenge
+    ? `is on a ${a.streak_count}-match ${a.match_type} streak — who can take them down?`
+    : `just hit a ${a.streak_count}-match ${a.match_type} streak. Congrats!`;
+
+  return (
+    <li className="flex items-start gap-3 rounded-lg bg-zinc-50 dark:bg-zinc-900/60 px-3 py-2.5">
+      <Avatar
+        avatarUrl={a.avatar_url}
+        displayName={a.display_name}
+        intense={challenge}
+      />
+      <div className="flex-1 min-w-0">
+        <div className="text-sm text-zinc-900 dark:text-zinc-100 leading-snug">
+          <span className="font-display tracking-wider">{a.display_name}</span>{' '}
+          <span className="text-zinc-700 dark:text-zinc-300">{message}</span>
+        </div>
+        <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-widest font-display text-zinc-500 dark:text-zinc-500">
+          <span
+            className={
+              challenge
+                ? 'text-orange-500'
+                : 'text-amber-500'
+            }
+          >
+            🔥 {a.streak_count} wins
+          </span>
+          <span className="text-zinc-400 dark:text-zinc-600">·</span>
+          <span>{formatRelative(a.created_at)}</span>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function Avatar({
+  avatarUrl,
+  displayName,
+  intense,
+}: {
+  avatarUrl: string | null;
+  displayName: string;
+  intense: boolean;
+}) {
+  const ringColor = intense ? '#f97316' : '#fbbf24';
+  return (
+    <div className="relative shrink-0 w-10 h-10">
+      <span
+        className="absolute inset-0 rounded-full pointer-events-none"
+        style={{
+          border: `2px solid ${ringColor}`,
+          boxShadow: `0 0 6px ${ringColor}`,
+        }}
+        aria-hidden
+      />
+      <div className="relative z-10 w-10 h-10">
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt=""
+            className="w-10 h-10 rounded-full object-cover border border-zinc-200 dark:border-zinc-700"
+          />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center font-semibold">
+            {displayName?.[0]?.toUpperCase() ?? '?'}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function formatRelative(iso: string): string {
+  const d = new Date(iso);
+  const diffMs = Date.now() - d.getTime();
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day}d ago`;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }

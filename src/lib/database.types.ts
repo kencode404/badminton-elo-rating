@@ -73,6 +73,29 @@ export interface Database {
         };
         Relationships: [];
       };
+      streak_announcements: {
+        Row: {
+          id: string;
+          user_id: string;
+          match_type: MatchType;
+          streak_count: number;
+          created_at: string;
+          expires_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          match_type: MatchType;
+          streak_count: number;
+          created_at?: string;
+          expires_at?: string;
+        };
+        Update: {
+          streak_count?: number;
+          expires_at?: string;
+        };
+        Relationships: [];
+      };
       match_participants: {
         Row: {
           match_id: string;
