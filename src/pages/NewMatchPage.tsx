@@ -108,7 +108,7 @@ export function NewMatchPage() {
       <form onSubmit={onSubmit} className="space-y-4">
         <section className="glass-panel p-4 space-y-3">
           <div className="text-[11px] font-display uppercase tracking-widest text-cyan2-500 dark:text-cyan2-300">
-            Team A (you)
+            Your Team
           </div>
           {matchType === 'doubles' && (
             <PlayerPicker
@@ -133,9 +133,9 @@ export function NewMatchPage() {
             Score
           </div>
           <div className="flex items-center gap-3">
-            <ScoreInput label="Team A" value={scoreA} onChange={setScoreA} />
+            <ScoreInput label="Your Team" value={scoreA} onChange={setScoreA} />
             <span className="font-display text-2xl text-zinc-400 dark:text-zinc-600">:</span>
-            <ScoreInput label="Team B" value={scoreB} onChange={setScoreB} />
+            <ScoreInput label="Opponent Team" value={scoreB} onChange={setScoreB} />
           </div>
           <p className="text-[10px] text-zinc-500 dark:text-zinc-500 mt-2">
             Higher score wins. No ties.

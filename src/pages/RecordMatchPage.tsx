@@ -296,11 +296,15 @@ function TeamCol({
 }) {
   return (
     <div className={alignRight ? 'text-right' : ''}>
-      {mine && (
-        <div className="text-[9px] font-display uppercase tracking-widest text-cyan2-500 dark:text-cyan2-300 mb-0.5">
-          You
-        </div>
-      )}
+      <div
+        className={`text-[9px] font-display uppercase tracking-widest mb-0.5 ${
+          mine
+            ? 'text-cyan2-500 dark:text-cyan2-300'
+            : 'text-zinc-500 dark:text-zinc-500'
+        }`}
+      >
+        {mine ? 'Your Team' : 'Opponent'}
+      </div>
       <div className="space-y-0.5">
         {players.map((p) => (
           <div
