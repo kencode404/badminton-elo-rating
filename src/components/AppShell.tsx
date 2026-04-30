@@ -179,18 +179,27 @@ function RanksIcon() {
 function MatchIcon() {
   return (
     <svg
-      width="22"
-      height="22"
+      width="26"
+      height="26"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.9"
+      strokeWidth="1.7"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
     >
-      <path d="M12 5v14" />
-      <path d="M5 12h14" />
+      {/* shuttlecock shaft (cork → feather end) on a smash diagonal */}
+      <path d="M17 7 L10.5 13.5" />
+      {/* feather flare: V opening behind the shaft */}
+      <path d="M8.5 11.5 L10.5 13.5 L12.5 15.5" />
+      <path d="M7.5 14.5 L10.5 13.5 L9.5 16.5" />
+      {/* cork (heavy hitting end) */}
+      <circle cx="17" cy="7" r="1.9" fill="currentColor" stroke="none" />
+      {/* motion / speed lines trailing the smash */}
+      <path d="M3 20 L5.5 17.5" />
+      <path d="M2.5 16 L4 14.5" />
+      <path d="M5 21.5 L6.5 20" />
     </svg>
   );
 }
