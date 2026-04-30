@@ -60,14 +60,20 @@ export function SignUpPage() {
       <div className="relative w-full max-w-sm glass-panel p-7">
         <div className="text-center mb-6">
           <div
-            className="mx-auto w-16 h-16 rounded-2xl flex items-center justify-center text-2xl text-white border border-cyan2-400/40"
+            className="mx-auto w-16 h-16 rounded-2xl flex items-center justify-center border border-cyan2-400/40 overflow-hidden"
             style={{
               background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)',
               boxShadow: '0 0 18px rgba(34, 211, 238, 0.4)',
             }}
             aria-hidden
           >
-            ◆
+            <img
+              src="/shuttlecock.png"
+              alt=""
+              width={40}
+              height={40}
+              className="invert"
+            />
           </div>
           <h1 className="font-display tracking-[0.2em] text-base text-zinc-900 dark:text-zinc-100 mt-4 uppercase">
             Create Account
