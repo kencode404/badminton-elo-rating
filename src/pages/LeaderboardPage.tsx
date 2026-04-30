@@ -221,11 +221,11 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
 // flame body sits behind it and the tongues lick upward. A CSS breathe
 // animation pulses the size + rises slightly to fake combustion movement.
 function FlameHalo({ intense }: { intense: boolean }) {
-  // Intense streaks get a bigger flame.
-  const sizePx = intense ? 72 : 60;
-  // Center horizontally on the avatar; anchor near the avatar's bottom.
-  const offsetX = (sizePx - 36) / 2;
-  const offsetY = sizePx - 32; // flame rises above the avatar
+  // Centered behind the avatar and big enough that the flame shows on
+  // all sides — avatar (36px) sits in the middle, flame extends well
+  // beyond it.
+  const sizePx = intense ? 96 : 78;
+  const offset = (sizePx - 36) / 2;
 
   return (
     <img
@@ -235,12 +235,12 @@ function FlameHalo({ intense }: { intense: boolean }) {
       height={sizePx}
       className="absolute z-0 pointer-events-none select-none"
       style={{
-        left: -offsetX,
-        top: -offsetY,
+        left: -offset,
+        top: -offset,
         animation: intense
           ? 'flame-breathe 1.4s ease-in-out infinite'
           : 'flame-breathe 2.2s ease-in-out infinite',
-        transformOrigin: '50% 100%',
+        transformOrigin: '50% 50%',
       }}
       aria-hidden
     />
