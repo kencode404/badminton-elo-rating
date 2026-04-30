@@ -290,7 +290,11 @@ function TeamCol({
   mine,
   alignRight = false,
 }: {
-  players: { user_id: string; profile: { display_name: string; avatar_url: string | null } }[];
+  players: {
+    user_id: string;
+    confirmation: 'pending' | 'accepted' | 'rejected';
+    profile: { display_name: string; avatar_url: string | null };
+  }[];
   mine: boolean;
   alignRight?: boolean;
 }) {
@@ -309,14 +313,54 @@ function TeamCol({
         {players.map((p) => (
           <div
             key={p.user_id}
-            className="text-xs text-zinc-900 dark:text-zinc-100 truncate"
-            title={p.profile.display_name}
+            className={`flex items-center gap-1.5 ${alignRight ? 'flex-row-reverse' : ''}`}
+            title={`${p.profile.display_name} — ${p.confirmation}`}
           >
-            {p.profile.display_name}
+            <ConfirmationDot confirmation={p.confirmation} />
+            <span className="text-xs text-zinc-900 dark:text-zinc-100 truncate">
+              {p.profile.display_name}
+            </span>
           </div>
         ))}
       </div>
     </div>
+  );
+}
+
+function ConfirmationDot({
+  confirmation,
+}: {
+  confirmation: 'pending' | 'accepted' | 'rejected';
+}) {
+  if (confirmation === 'accepted') {
+    return (
+      <span
+        aria-label="accepted"
+        className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-500 shrink-0"
+      >
+        <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M2 6.5 L5 9.5 L10 3.5" />
+        </svg>
+      </span>
+    );
+  }
+  if (confirmation === 'rejected') {
+    return (
+      <span
+        aria-label="rejected"
+        className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500/20 text-red-500 shrink-0"
+      >
+        <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+          <path d="M3 3 L9 9 M9 3 L3 9" />
+        </svg>
+      </span>
+    );
+  }
+  return (
+    <span
+      aria-label="pending"
+      className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-zinc-400 dark:border-zinc-600 shrink-0"
+    />
   );
 }
 

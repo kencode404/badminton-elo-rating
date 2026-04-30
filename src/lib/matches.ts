@@ -1,13 +1,20 @@
 import { supabase } from './supabase';
-import type { Database, MatchType, Team } from './database.types';
+import type { Confirmation, Database, MatchType, Team } from './database.types';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 type Match = Database['public']['Tables']['matches']['Row'];
 
+export interface ParticipantSummary {
+  user_id: string;
+  team: Team;
+  confirmation: Confirmation;
+  profile: Pick<Profile, 'id' | 'display_name' | 'avatar_url'>;
+}
+
 export interface PendingMatchSummary {
   match: Match;
   myTeam: Team;
-  participants: Array<{ user_id: string; team: Team; profile: Pick<Profile, 'id' | 'display_name' | 'avatar_url'> }>;
+  participants: ParticipantSummary[];
 }
 
 export async function searchPlayers(
@@ -121,9 +128,9 @@ export async function respondToMatch(
 export interface MatchSummary {
   match: Match;
   myTeam: Team;
-  myConfirmation: 'pending' | 'accepted' | 'rejected';
+  myConfirmation: Confirmation;
   myRatingDelta: number | null;
-  participants: Array<{ user_id: string; team: Team; profile: Pick<Profile, 'id' | 'display_name' | 'avatar_url'> }>;
+  participants: ParticipantSummary[];
 }
 
 // All matches the current user is a participant in, newest first.
@@ -148,7 +155,7 @@ export async function getMyMatches(userId: string, limit = 50): Promise<MatchSum
   const liveIds = matches.map((m) => m.id);
   const { data: parts, error: e3 } = await supabase
     .from('match_participants')
-    .select('match_id, user_id, team')
+    .select('match_id, user_id, team, confirmation')
     .in('match_id', liveIds);
   if (e3) throw e3;
 
@@ -162,11 +169,12 @@ export async function getMyMatches(userId: string, limit = 50): Promise<MatchSum
 
   return matches.map((match) => {
     const me = mine.find((m) => m.match_id === match.id)!;
-    const matchParts = (parts ?? [])
+    const matchParts: ParticipantSummary[] = (parts ?? [])
       .filter((p) => p.match_id === match.id)
       .map((p) => ({
         user_id: p.user_id,
         team: p.team as Team,
+        confirmation: p.confirmation as Confirmation,
         profile: profileMap.get(p.user_id) ?? {
           id: p.user_id,
           display_name: 'Unknown',
@@ -176,7 +184,7 @@ export async function getMyMatches(userId: string, limit = 50): Promise<MatchSum
     return {
       match,
       myTeam: me.team as Team,
-      myConfirmation: me.confirmation as MatchSummary['myConfirmation'],
+      myConfirmation: me.confirmation as Confirmation,
       myRatingDelta: me.rating_delta ?? null,
       participants: matchParts,
     };
@@ -207,7 +215,7 @@ export async function getPendingForUser(userId: string): Promise<PendingMatchSum
 
   const { data: parts, error: e3 } = await supabase
     .from('match_participants')
-    .select('match_id, user_id, team')
+    .select('match_id, user_id, team, confirmation')
     .in('match_id', liveIds);
   if (e3) throw e3;
 
@@ -221,11 +229,12 @@ export async function getPendingForUser(userId: string): Promise<PendingMatchSum
 
   return matches.map((match) => {
     const me = myPending.find((p) => p.match_id === match.id)!;
-    const matchParts = (parts ?? [])
+    const matchParts: ParticipantSummary[] = (parts ?? [])
       .filter((p) => p.match_id === match.id)
       .map((p) => ({
         user_id: p.user_id,
         team: p.team as Team,
+        confirmation: p.confirmation as Confirmation,
         profile: profileMap.get(p.user_id) ?? {
           id: p.user_id,
           display_name: 'Unknown',
