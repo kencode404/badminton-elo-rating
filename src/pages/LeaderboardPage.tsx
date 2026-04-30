@@ -195,17 +195,16 @@ function Row({
 function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
   const intense = streak >= 3;
   const showFx = streak >= 2;
-  const ringColor = intense ? '#f97316' : '#fbbf24'; // warm growing ring
-  const sparkColor = ringColor; // sparks match the fire-coloured ring
-  const boltCount = intense ? 6 : 4;
-  const haloPx = 60;
-  const haloOff = (haloPx - 36) / 2;
+  const ringColor = intense ? '#f97316' : '#fbbf24';
+  const sparkColor = ringColor;
+  const boltCount = intense ? 8 : 5;
+  const dur = intense ? 0.9 : 1.3;
 
   return (
     <div className="relative shrink-0 w-9 h-9">
       {showFx && (
         <>
-          {/* warm growing ring (the original effect) */}
+          {/* warm growing ring */}
           <span
             className="absolute inset-0 rounded-full pointer-events-none"
             style={{
@@ -217,41 +216,43 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
             }}
             aria-hidden
           />
-          {/* electric sparks radiating outward */}
-          <svg
-            width={haloPx}
-            height={haloPx}
-            viewBox="0 0 60 60"
-            className="absolute z-0 pointer-events-none"
-            style={{ left: -haloOff, top: -haloOff }}
-            aria-hidden
-          >
-            {Array.from({ length: boltCount }).map((_, i) => {
-              const angle = (i * 360) / boltCount + (i % 2 === 0 ? 0 : 22);
-              const delay = (i * 0.13).toFixed(2);
-              const dur = (0.5 + ((i * 7) % 5) * 0.05).toFixed(2);
-              return (
-                <g
-                  key={i}
-                  transform={`translate(30 30) rotate(${angle}) translate(0 -19)`}
+          {/* sparks burst from inner radius outward, fade as they go */}
+          {Array.from({ length: boltCount }).map((_, i) => {
+            const angle = (i * 360) / boltCount + (i % 2 === 0 ? 0 : 22);
+            const delay = ((i * dur) / boltCount).toFixed(2);
+            return (
+              <span
+                key={i}
+                className="absolute top-1/2 left-1/2 w-0 h-0 pointer-events-none"
+                style={
+                  {
+                    '--spark-rotate': `${angle}deg`,
+                    animation: `spark-burst ${dur}s ease-out infinite`,
+                    animationDelay: `${delay}s`,
+                  } as React.CSSProperties
+                }
+                aria-hidden
+              >
+                <svg
+                  width="6"
+                  height="11"
+                  viewBox="-3 -11 6 11"
+                  style={{ position: 'absolute', left: -3, top: -11 }}
+                  aria-hidden
                 >
                   <path
-                    d="M 0 0 L 2 -3 L -1.2 -5 L 1.6 -8"
+                    d="M 0 0 L 1.2 -3 L -1.2 -5.5 L 1 -8 L -0.5 -10.5"
                     stroke={sparkColor}
                     strokeWidth="1.3"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     fill="none"
-                    style={{
-                      filter: `drop-shadow(0 0 2px ${sparkColor})`,
-                      animation: `spark-bolt ${dur}s ease-in-out infinite`,
-                      animationDelay: `${delay}s`,
-                    }}
+                    style={{ filter: `drop-shadow(0 0 2px ${sparkColor})` }}
                   />
-                </g>
-              );
-            })}
-          </svg>
+                </svg>
+              </span>
+            );
+          })}
         </>
       )}
       <div className="relative z-10 w-9 h-9">

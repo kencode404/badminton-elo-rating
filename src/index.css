@@ -13,9 +13,18 @@
   }
 }
 
-@keyframes spark-bolt {
-  0%, 70%, 100% { opacity: 0; transform: scaleY(0.6); }
-  78%, 88% { opacity: 1; transform: scaleY(1); }
+@keyframes spark-burst {
+  0% {
+    transform: rotate(var(--spark-rotate)) translateY(-18px);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(var(--spark-rotate)) translateY(-30px);
+    opacity: 0;
+  }
 }
 
 @layer base {
