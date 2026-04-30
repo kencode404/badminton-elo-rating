@@ -101,7 +101,37 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      get_user_win_counts: {
+        Args: { p_user_id: string };
+        Returns: { singles_wins: number; doubles_wins: number }[];
+      };
+      get_recent_matches: {
+        Args: { p_user_id: string; p_limit?: number };
+        Returns: {
+          match_id: string;
+          match_type: MatchType;
+          played_at: string;
+          user_team: Team;
+          score_a: number;
+          score_b: number;
+          rating_delta: number | null;
+          others: Array<{ user_id: string; display_name: string; team: Team }>;
+        }[];
+      };
+      get_win_streaks: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          user_id: string;
+          singles_streak: number;
+          doubles_streak: number;
+        }[];
+      };
+      is_match_participant: {
+        Args: { p_match_id: string; p_user_id: string };
+        Returns: boolean;
+      };
+    };
     Enums: {
       match_type: MatchType;
       match_status: MatchStatus;

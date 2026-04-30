@@ -10,6 +10,7 @@ type Profile = Database['public']['Tables']['profiles']['Row'];
 export function ProfilePage() {
   const { user, signOut } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [winCounts, setWinCounts] = useState<{ singles: number; doubles: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,6 +36,18 @@ export function ProfilePage() {
         if (error) setError(error.message);
         else setProfile(data);
         setLoading(false);
+      });
+    supabase
+      .rpc('get_user_win_counts', { p_user_id: user.id })
+      .then(({ data }) => {
+        if (!active) return;
+        const row = (data ?? [])[0] as
+          | { singles_wins: number; doubles_wins: number }
+          | undefined;
+        setWinCounts({
+          singles: row?.singles_wins ?? 0,
+          doubles: row?.doubles_wins ?? 0,
+        });
       });
     return () => {
       active = false;
@@ -211,8 +224,18 @@ export function ProfilePage() {
           <p className="text-sm text-zinc-500 dark:text-zinc-500">Loading…</p>
         ) : profile ? (
           <div className="grid grid-cols-2 gap-3">
-            <Stat label="Doubles" rating={profile.doubles_rating} games={profile.doubles_games_played} />
-            <Stat label="Singles" rating={profile.singles_rating} games={profile.singles_games_played} />
+            <Stat
+              label="Doubles"
+              rating={profile.doubles_rating}
+              games={profile.doubles_games_played}
+              wins={winCounts?.doubles ?? 0}
+            />
+            <Stat
+              label="Singles"
+              rating={profile.singles_rating}
+              games={profile.singles_games_played}
+              wins={winCounts?.singles ?? 0}
+            />
           </div>
         ) : (
           <p className="text-sm text-zinc-500 dark:text-zinc-500">
@@ -276,7 +299,18 @@ export function ProfilePage() {
   );
 }
 
-function Stat({ label, rating, games }: { label: string; rating: number; games: number }) {
+function Stat({
+  label,
+  rating,
+  games,
+  wins,
+}: {
+  label: string;
+  rating: number;
+  games: number;
+  wins: number;
+}) {
+  const winRate = games > 0 ? Math.round((wins / games) * 100) : null;
   return (
     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
       <div className="text-[10px] font-display uppercase tracking-wider text-cyan2-500 dark:text-cyan2-300">
@@ -285,6 +319,9 @@ function Stat({ label, rating, games }: { label: string; rating: number; games: 
       <div className="font-display text-2xl mt-1 text-zinc-900 dark:text-zinc-100">{rating}</div>
       <div className="text-[10px] text-zinc-500 dark:text-zinc-500 mt-0.5 uppercase tracking-wider">
         {games} games
+      </div>
+      <div className="text-[10px] text-zinc-700 dark:text-zinc-300 mt-1 font-display tracking-wider">
+        {winRate !== null ? `${wins}W · ${winRate}%` : '— no games'}
       </div>
     </div>
   );

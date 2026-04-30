@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { formatError } from '../lib/errors';
+import { ProfileDetailModal } from '../components/ProfileDetailModal';
 import type { Database } from '../lib/database.types';
 
 type Tab = 'singles' | 'doubles';
@@ -13,6 +14,7 @@ export function LeaderboardPage() {
   const [rows, setRows] = useState<Profile[] | null>(null);
   const [streaks, setStreaks] = useState<Map<string, { singles: number; doubles: number }>>(new Map());
   const [error, setError] = useState<string | null>(null);
+  const [openUserId, setOpenUserId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -114,10 +116,15 @@ export function LeaderboardPage() {
                 tab={tab}
                 isMe={user?.id === p.id}
                 streak={streak}
+                onClick={() => setOpenUserId(p.id)}
               />
             );
           })}
         </ol>
+      )}
+
+      {openUserId && (
+        <ProfileDetailModal userId={openUserId} onClose={() => setOpenUserId(null)} />
       )}
     </div>
   );
@@ -129,12 +136,14 @@ function Row({
   tab,
   isMe,
   streak,
+  onClick,
 }: {
   rank: number;
   profile: Profile;
   tab: Tab;
   isMe: boolean;
   streak: number;
+  onClick: () => void;
 }) {
   const rating = tab === 'singles' ? profile.singles_rating : profile.doubles_rating;
   const games = tab === 'singles' ? profile.singles_games_played : profile.doubles_games_played;
@@ -142,13 +151,19 @@ function Row({
 
   return (
     <li
-      className={`glass-panel p-3 flex items-center gap-3 ${
+      className={`glass-panel ${
         isMe ? 'ring-1 ring-cyan2-400/60' : ''
       }`}
     >
-      <div className="w-7 text-center font-display text-sm text-zinc-500 dark:text-zinc-400 shrink-0">
-        {medal ?? `#${rank}`}
-      </div>
+      <button
+        type="button"
+        onClick={onClick}
+        className="w-full p-3 flex items-center gap-3 text-left active:scale-[0.99] transition rounded-2xl"
+        aria-label={`View ${profile.display_name}'s profile`}
+      >
+        <div className="w-7 text-center font-display text-sm text-zinc-500 dark:text-zinc-400 shrink-0">
+          {medal ?? `#${rank}`}
+        </div>
 
       <Avatar profile={profile} streak={streak} />
 
@@ -185,14 +200,15 @@ function Row({
         </div>
       </div>
 
-      <div className="text-right shrink-0">
-        <div className="font-display text-lg leading-none text-zinc-900 dark:text-zinc-100">
-          {rating}
+        <div className="text-right shrink-0">
+          <div className="font-display text-lg leading-none text-zinc-900 dark:text-zinc-100">
+            {rating}
+          </div>
+          <div className="text-[9px] text-zinc-500 dark:text-zinc-500 tracking-widest uppercase mt-0.5">
+            Rating
+          </div>
         </div>
-        <div className="text-[9px] text-zinc-500 dark:text-zinc-500 tracking-widest uppercase mt-0.5">
-          Rating
-        </div>
-      </div>
+      </button>
     </li>
   );
 }
