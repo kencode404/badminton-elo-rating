@@ -193,7 +193,10 @@ function Row({
 }
 
 function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
-  // Streak ring: amber at 2 wins, brighter orange + pulse + bigger flame at 3+.
+  // Flame halo: 4 small flames at 2 wins, 8 animated flames + brighter
+  // glow at 3+ wins.
+  const flameCount = streak >= 3 ? 8 : streak >= 2 ? 4 : 0;
+  const animated = streak >= 3;
   const ringClass =
     streak >= 3
       ? 'ring-2 ring-orange-500'
@@ -202,38 +205,77 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
         : '';
   const ringStyle =
     streak >= 3
-      ? { boxShadow: '0 0 10px rgba(249, 115, 22, 0.65)' }
+      ? { boxShadow: '0 0 12px rgba(249, 115, 22, 0.65)' }
       : streak >= 2
-        ? { boxShadow: '0 0 6px rgba(251, 191, 36, 0.5)' }
+        ? { boxShadow: '0 0 8px rgba(251, 191, 36, 0.5)' }
         : undefined;
 
   return (
-    <div className="relative shrink-0">
-      {profile.avatar_url ? (
-        <img
-          src={profile.avatar_url}
-          alt=""
-          className={`w-9 h-9 rounded-full object-cover border border-zinc-200 dark:border-zinc-700 ${ringClass}`}
-          style={ringStyle}
+    <div className="relative shrink-0 w-9 h-9">
+      {flameCount > 0 && (
+        <FlameRing
+          count={flameCount}
+          animated={animated}
+          radius={streak >= 3 ? 22 : 20}
+          size={streak >= 3 ? 13 : 11}
         />
-      ) : (
-        <div
-          className={`w-9 h-9 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center font-semibold ${ringClass}`}
-          style={ringStyle}
-        >
-          {profile.display_name?.[0]?.toUpperCase() ?? '?'}
-        </div>
       )}
-      {streak >= 2 && (
-        <span
-          className={`absolute -top-1 -right-1 leading-none select-none ${
-            streak >= 3 ? 'text-base animate-pulse' : 'text-[11px]'
-          }`}
-          aria-hidden
-        >
-          🔥
-        </span>
-      )}
+      <div className="relative z-10 w-9 h-9">
+        {profile.avatar_url ? (
+          <img
+            src={profile.avatar_url}
+            alt=""
+            className={`w-9 h-9 rounded-full object-cover border border-zinc-200 dark:border-zinc-700 ${ringClass}`}
+            style={ringStyle}
+          />
+        ) : (
+          <div
+            className={`w-9 h-9 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center font-semibold ${ringClass}`}
+            style={ringStyle}
+          >
+            {profile.display_name?.[0]?.toUpperCase() ?? '?'}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FlameRing({
+  count,
+  animated,
+  radius,
+  size,
+}: {
+  count: number;
+  animated: boolean;
+  radius: number;
+  size: number;
+}) {
+  return (
+    <div
+      className="absolute inset-0 z-0 pointer-events-none"
+      aria-hidden
+    >
+      {Array.from({ length: count }).map((_, i) => {
+        const angle = (i * 360) / count;
+        return (
+          <span
+            key={i}
+            className={`absolute top-1/2 left-1/2 leading-none select-none ${
+              animated ? 'animate-pulse' : ''
+            }`}
+            style={{
+              fontSize: `${size}px`,
+              transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-${radius}px)`,
+              animationDelay: animated ? `${(i * 0.12).toFixed(2)}s` : undefined,
+              filter: 'drop-shadow(0 0 3px rgba(249, 115, 22, 0.7))',
+            }}
+          >
+            🔥
+          </span>
+        );
+      })}
     </div>
   );
 }
