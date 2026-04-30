@@ -63,7 +63,7 @@ export function HomePage() {
           ◆
         </div>
         <h2 className="font-display tracking-[0.15em] text-base text-zinc-900 dark:text-zinc-100 mb-1">
-          WELCOME, COMMANDER
+          WELCOME, PLAYER
         </h2>
         <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
           Track your singles & doubles ratings. Record matches, await all-player
