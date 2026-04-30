@@ -170,7 +170,7 @@ function Row({
               }`}
               title={`${streak}-win streak`}
             >
-              {streak}W
+              {streak} wins
             </span>
           )}
           {isMe && <span className="text-[9px] tracking-widest ml-1">· you</span>}
