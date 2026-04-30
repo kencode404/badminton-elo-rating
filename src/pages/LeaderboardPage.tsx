@@ -197,7 +197,7 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
   const showFx = streak >= 2;
   const ringColor = intense ? '#f97316' : '#fbbf24';
   const sparkColor = ringColor;
-  const boltCount = intense ? 5 : 4;
+  const boltCount = intense ? 12 : 8;
 
   return (
     <div className="relative shrink-0 w-9 h-9">
@@ -215,8 +215,8 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
             }}
             aria-hidden
           />
-          {/* sparks burst from inner radius outward at varying distances/
-              speeds/delays so they look random rather than choreographed */}
+          {/* spark dots burst from the avatar perimeter outward, randomised
+              distance / speed / delay / size so they look organic */}
           {Array.from({ length: boltCount }).map((_, i) => {
             const baseAngle = (i * 360) / boltCount;
             const jitter = ((i * 47) % 30) - 15;            // ±15°
@@ -224,6 +224,7 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
             const endDist = 26 + ((i * 13) % 14);            // 26–39 px out
             const dur = 0.85 + ((i * 11) % 7) * 0.06;        // ~0.85–1.21s
             const delay = ((i * 31) % 100) / 100;            // 0–1.0s
+            const size = 1 + ((i * 7) % 3) * 0.5;            // 1, 1.5, or 2px
             return (
               <span
                 key={i}
@@ -238,23 +239,18 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
                 }
                 aria-hidden
               >
-                <svg
-                  width="6"
-                  height="11"
-                  viewBox="-3 -11 6 11"
-                  style={{ position: 'absolute', left: -3, top: -11 }}
-                  aria-hidden
-                >
-                  <path
-                    d="M 0 0 L 1.2 -3 L -1.2 -5.5 L 1 -8 L -0.5 -10.5"
-                    stroke={sparkColor}
-                    strokeWidth="1.3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    fill="none"
-                    style={{ filter: `drop-shadow(0 0 2px ${sparkColor})` }}
-                  />
-                </svg>
+                <span
+                  style={{
+                    position: 'absolute',
+                    left: -size / 2,
+                    top: -size / 2,
+                    width: size,
+                    height: size,
+                    borderRadius: '50%',
+                    background: sparkColor,
+                    boxShadow: `0 0 ${size + 3}px ${sparkColor}, 0 0 ${size + 6}px ${sparkColor}`,
+                  }}
+                />
               </span>
             );
           })}
