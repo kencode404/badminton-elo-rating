@@ -194,30 +194,29 @@ function Row({
 
 function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
   const intense = streak >= 3;
-  const showFx = streak >= 2;
+  const showRing = streak >= 2;
+  const showSparks = streak >= 4;
   const ringColor = intense ? '#f97316' : '#fbbf24';
   const sparkColor = ringColor;
-  const boltCount = intense ? 12 : 8;
+  const boltCount = streak >= 5 ? 12 : 8;
 
   return (
     <div className="relative shrink-0 w-9 h-9">
-      {showFx && (
-        <>
-          {/* warm growing ring */}
-          <span
-            className="absolute inset-0 rounded-full pointer-events-none"
-            style={{
-              border: `2px solid ${ringColor}`,
-              boxShadow: `0 0 8px ${ringColor}`,
-              animation: intense
-                ? 'ring-grow 1.2s ease-in-out infinite'
-                : 'ring-grow 2s ease-in-out infinite',
-            }}
-            aria-hidden
-          />
-          {/* spark dots burst from the avatar perimeter outward, randomised
-              distance / speed / delay / size so they look organic */}
-          {Array.from({ length: boltCount }).map((_, i) => {
+      {showRing && (
+        <span
+          className="absolute inset-0 rounded-full pointer-events-none"
+          style={{
+            border: `2px solid ${ringColor}`,
+            boxShadow: `0 0 8px ${ringColor}`,
+            animation: intense
+              ? 'ring-grow 1.2s ease-in-out infinite'
+              : 'ring-grow 2s ease-in-out infinite',
+          }}
+          aria-hidden
+        />
+      )}
+      {showSparks &&
+        Array.from({ length: boltCount }).map((_, i) => {
             const baseAngle = (i * 360) / boltCount;
             const jitter = ((i * 47) % 30) - 15;            // ±15°
             const angle = baseAngle + jitter;
@@ -253,9 +252,7 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
                 />
               </span>
             );
-          })}
-        </>
-      )}
+        })}
       <div className="relative z-10 w-9 h-9">
         {profile.avatar_url ? (
           <img
