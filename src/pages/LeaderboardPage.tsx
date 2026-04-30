@@ -169,6 +169,11 @@ function Row({
                   : 'bg-amber-500/10 text-amber-500'
               }`}
               title={`${streak}-win streak`}
+              style={{
+                animation: `pill-pulse ${
+                  streak >= 4 ? '1.4s' : streak >= 3 ? '2s' : '2.6s'
+                } ease-in-out infinite`,
+              }}
             >
               {streak} wins
             </span>

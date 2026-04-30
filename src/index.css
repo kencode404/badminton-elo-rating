@@ -27,6 +27,17 @@
   }
 }
 
+@keyframes pill-pulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.06);
+    filter: brightness(1.2);
+  }
+}
+
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
