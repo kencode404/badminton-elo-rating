@@ -194,23 +194,65 @@ function Row({
 
 function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
   const intense = streak >= 3;
-  const showRing = streak >= 2;
-  const ringColor = intense ? '#f97316' : '#fbbf24';
+  const showFx = streak >= 2;
+  const ringColor = intense ? '#f97316' : '#fbbf24'; // warm growing ring
+  const sparkColor = ringColor; // sparks match the fire-coloured ring
+  const boltCount = intense ? 6 : 4;
+  const haloPx = 60;
+  const haloOff = (haloPx - 36) / 2;
 
   return (
     <div className="relative shrink-0 w-9 h-9">
-      {showRing && (
-        <span
-          className="absolute inset-0 rounded-full pointer-events-none"
-          style={{
-            border: `2px solid ${ringColor}`,
-            boxShadow: `0 0 8px ${ringColor}`,
-            animation: intense
-              ? 'ring-grow 1.2s ease-in-out infinite'
-              : 'ring-grow 2s ease-in-out infinite',
-          }}
-          aria-hidden
-        />
+      {showFx && (
+        <>
+          {/* warm growing ring (the original effect) */}
+          <span
+            className="absolute inset-0 rounded-full pointer-events-none"
+            style={{
+              border: `2px solid ${ringColor}`,
+              boxShadow: `0 0 8px ${ringColor}`,
+              animation: intense
+                ? 'ring-grow 1.2s ease-in-out infinite'
+                : 'ring-grow 2s ease-in-out infinite',
+            }}
+            aria-hidden
+          />
+          {/* electric sparks radiating outward */}
+          <svg
+            width={haloPx}
+            height={haloPx}
+            viewBox="0 0 60 60"
+            className="absolute z-0 pointer-events-none"
+            style={{ left: -haloOff, top: -haloOff }}
+            aria-hidden
+          >
+            {Array.from({ length: boltCount }).map((_, i) => {
+              const angle = (i * 360) / boltCount + (i % 2 === 0 ? 0 : 22);
+              const delay = (i * 0.13).toFixed(2);
+              const dur = (0.5 + ((i * 7) % 5) * 0.05).toFixed(2);
+              return (
+                <g
+                  key={i}
+                  transform={`translate(30 30) rotate(${angle}) translate(0 -19)`}
+                >
+                  <path
+                    d="M 0 0 L 2 -3 L -1.2 -5 L 1.6 -8"
+                    stroke={sparkColor}
+                    strokeWidth="1.3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                    style={{
+                      filter: `drop-shadow(0 0 2px ${sparkColor})`,
+                      animation: `spark-bolt ${dur}s ease-in-out infinite`,
+                      animationDelay: `${delay}s`,
+                    }}
+                  />
+                </g>
+              );
+            })}
+          </svg>
+        </>
       )}
       <div className="relative z-10 w-9 h-9">
         {profile.avatar_url ? (
