@@ -216,105 +216,87 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
   );
 }
 
-// Cartoon comet-trail fire halo. Asymmetric: most tongues cluster around
-// the upper-right (the "trail" direction), with a few smaller wisps on
-// the opposite side wrapping the avatar. Each tongue is built from three
-// stacked paths — red outer outline, orange middle, yellow inner highlight —
-// so it reads like a chunky comic-book flame. A subtle feTurbulence
-// flicker shimmers the edges; the whole halo slowly spins.
+// Realistic single-source fire behind the avatar. One tall ellipse with
+// a white-hot core fading through yellow → orange → red → transparent.
+// feTurbulence + feDisplacementMap warps the silhouette into living
+// flame edges; animating the turbulence seed makes it flicker, and a
+// CSS breathe animation makes the whole flame swell and rise like real
+// combustion.
 function FlameHalo({ intense }: { intense: boolean }) {
   const id = useId().replace(/:/g, '');
   const filterId = `flame-f-${id}`;
+  const gradId = `flame-g-${id}`;
 
-  // Halo box is much larger than the avatar so the trail can extend far.
-  const haloPx = 96;
-  const offset = (haloPx - 36) / 2;
-
-  // Each tongue: angle around the avatar (0 = up; positive = clockwise),
-  // and a length scale (Y stretch). Big tongues cluster upper-right;
-  // small wisps trail behind on the lower-left.
-  const tongues: { angle: number; len: number }[] = intense
-    ? [
-        { angle: -10, len: 1.35 },
-        { angle: 25, len: 1.7 },   // trail tip — biggest
-        { angle: 55, len: 1.45 },
-        { angle: 85, len: 1.15 },
-        { angle: 120, len: 0.85 },
-        { angle: 160, len: 0.7 },
-        { angle: 210, len: 0.7 },
-        { angle: 250, len: 0.85 },
-        { angle: 290, len: 1.0 },
-        { angle: 325, len: 1.2 },  // back end of trail circle
-      ]
-    : [
-        { angle: -5, len: 1.25 },
-        { angle: 30, len: 1.55 },  // trail tip
-        { angle: 65, len: 1.3 },
-        { angle: 100, len: 1.0 },
-        { angle: 200, len: 0.65 }, // small wisp far side
-        { angle: 270, len: 0.85 }, // small wisp far side
-        { angle: 320, len: 1.0 },
-      ];
-
-  // Three nested cartoon-flame paths (outer → middle → inner). Each has a
-  // chunky base curving up to multiple peaks (the "licks").
-  const outerPath =
-    'M -11 0 C -13 -8 -11 -16 -8 -17 Q -5 -25 -3 -17 Q -1 -29 1 -17 Q 3 -27 6 -17 Q 9 -22 11 -17 C 13 -10 13 -2 11 0 Z';
-  const middlePath =
-    'M -8 0 C -9 -6 -8 -12 -5.5 -13 Q -3.5 -20 -2 -13 Q -0.5 -23 0.5 -13 Q 2 -22 4 -13 Q 6 -17 7.5 -13 C 9 -7 9 -2 7.5 0 Z';
-  const innerPath =
-    'M -4.5 0 C -5 -4 -4 -8 -3 -9 Q -1.8 -14 -1 -9 Q -0.3 -16 0.3 -9 Q 1 -15 2 -9 Q 3 -12 4 -9 C 4.8 -5 4.8 -2 4 0 Z';
+  // Taller-than-wide box so the flame is vertical. Box extends both
+  // sideways and especially upward beyond the avatar.
+  const haloW = 72;
+  const haloH = 96;
+  const offsetX = (haloW - 36) / 2;
+  const offsetY = (haloH - 36) / 2 + 6; // shift up a bit so flame rises above center
 
   return (
     <svg
-      width={haloPx}
-      height={haloPx}
-      viewBox="0 0 100 100"
+      width={haloW}
+      height={haloH}
+      viewBox="0 0 100 140"
       className="absolute z-0 pointer-events-none"
       style={{
-        left: -offset,
-        top: -offset,
+        left: -offsetX,
+        top: -offsetY,
         animation: intense
-          ? 'flame-spin 7s linear infinite'
-          : 'flame-spin 14s linear infinite',
+          ? 'flame-breathe 1.6s ease-in-out infinite'
+          : 'flame-breathe 2.4s ease-in-out infinite',
+        transformOrigin: '50% 90%',
       }}
       aria-hidden
     >
       <defs>
-        <filter id={filterId} x="-10%" y="-10%" width="120%" height="120%">
+        {/* feTurbulence in vertical-stretched mode warps the ellipse
+            edge into licking flame tongues. Seed animates for flicker. */}
+        <filter id={filterId} x="-30%" y="-20%" width="160%" height="140%">
           <feTurbulence
             type="fractalNoise"
-            baseFrequency="0.16"
-            numOctaves="2"
-            seed="2"
+            baseFrequency="0.025 0.06"
+            numOctaves="3"
+            seed="1"
             result="noise"
           >
             <animate
               attributeName="seed"
               from="0"
-              to="60"
-              dur={intense ? '2.4s' : '4s'}
+              to="80"
+              dur={intense ? '1.4s' : '2.6s'}
               repeatCount="indefinite"
             />
           </feTurbulence>
-          <feDisplacementMap in="SourceGraphic" in2="noise" scale={intense ? 3 : 2} />
+          <feDisplacementMap
+            in="SourceGraphic"
+            in2="noise"
+            scale={intense ? 22 : 16}
+          />
         </filter>
+        {/* Gradient: white-hot core → yellow → orange → red → fade.
+            cy biased toward the bottom so the brightest part is at
+            the avatar's level and the flame fades upward. */}
+        <radialGradient id={gradId} cx="0.5" cy="0.62" r="0.55">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.9" />
+          <stop offset="15%" stopColor="#fef08a" stopOpacity="0.95" />
+          <stop offset="35%" stopColor="#fb923c" stopOpacity="0.9" />
+          <stop offset="65%" stopColor="#dc2626" stopOpacity="0.6" />
+          <stop offset="100%" stopColor="#7c2d12" stopOpacity="0" />
+        </radialGradient>
       </defs>
-      <g filter={`url(#${filterId})`}>
-        {tongues.map((t, i) => {
-          const transform = `translate(50 50) rotate(${t.angle}) translate(0 -20) scale(1 ${t.len})`;
-          return (
-            <g key={i} transform={transform}>
-              {/* outer red */}
-              <path d={outerPath} fill="#b91c1c" />
-              {/* middle orange */}
-              <path d={middlePath} fill="#f97316" />
-              {/* inner yellow highlight */}
-              <path d={innerPath} fill="#fde047" />
-            </g>
-          );
-        })}
-      </g>
+      {/* Tall ellipse — taller than wide for a real flame shape. cy
+          near the bottom so the flame body sits behind the avatar and
+          tongues lick upward. */}
+      <ellipse
+        cx="50"
+        cy="86"
+        rx="34"
+        ry="50"
+        fill={`url(#${gradId})`}
+        filter={`url(#${filterId})`}
+      />
     </svg>
   );
 }

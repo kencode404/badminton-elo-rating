@@ -2,9 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
-@keyframes flame-spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+@keyframes flame-breathe {
+  0%, 100% {
+    transform: scale(1, 1) translateY(0);
+    opacity: 0.95;
+  }
+  35% {
+    transform: scale(1.08, 1.12) translateY(-3px);
+    opacity: 1;
+  }
+  70% {
+    transform: scale(0.96, 1.05) translateY(-1px);
+    opacity: 0.92;
+  }
 }
 
 @layer base {
