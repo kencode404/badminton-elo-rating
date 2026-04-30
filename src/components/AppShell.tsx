@@ -10,7 +10,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { to: '/', label: 'Home', icon: <span className="text-lg leading-none">◆</span> },
+  { to: '/', label: 'Home', icon: <HomeIcon /> },
   { to: '/leaderboard', label: 'Ranks', icon: <span className="text-lg leading-none">✦</span> },
   { to: '/record', label: 'Record', icon: <span className="text-lg leading-none">◈</span> },
   { to: '/profile', label: 'Profile', icon: <UserIcon /> },
@@ -81,6 +81,26 @@ export function AppShell() {
         ))}
       </nav>
     </div>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 11.5 12 4l9 7.5" />
+      <path d="M5 10v9.5a.5.5 0 0 0 .5.5h13a.5.5 0 0 0 .5-.5V10" />
+      <path d="M10 20v-5a2 2 0 0 1 2-2 2 2 0 0 1 2 2v5" />
+    </svg>
   );
 }
 
