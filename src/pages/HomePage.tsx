@@ -69,9 +69,9 @@ export function HomePage() {
       </section>
 
       {announcements && announcements.length > 0 && (
-        <section className="glass-panel p-5">
-          <div className="section-title mb-3">On A Streak</div>
-          <ul className="space-y-2">
+        <section className="glass-panel p-3">
+          <div className="section-title px-1 pb-2 text-[11px]">Streak Feed</div>
+          <ul className="space-y-1 max-h-72 overflow-y-auto pr-1">
             {announcements.map((a) => (
               <AnnouncementItem key={a.id} a={a} />
             ))}
@@ -85,33 +85,33 @@ export function HomePage() {
 function AnnouncementItem({ a }: { a: AnnouncementRow }) {
   const challenge = a.streak_count >= 3;
   const message = challenge
-    ? `is on a ${a.streak_count}-match ${a.match_type} streak — who can take them down?`
-    : `just hit a ${a.streak_count}-match ${a.match_type} streak. Congrats!`;
+    ? `${a.streak_count}-match ${a.match_type} streak 🔥 who's gonna stop them?`
+    : `2-match ${a.match_type} streak — nice 🔥`;
 
   return (
-    <li className="flex items-start gap-3 rounded-lg bg-zinc-50 dark:bg-zinc-900/60 px-3 py-2.5">
+    <li className="flex items-start gap-2 px-1 py-1.5">
       <Avatar
         avatarUrl={a.avatar_url}
         displayName={a.display_name}
         intense={challenge}
       />
       <div className="flex-1 min-w-0">
-        <div className="text-sm text-zinc-900 dark:text-zinc-100 leading-snug">
-          <span className="font-display tracking-wider">{a.display_name}</span>{' '}
-          <span className="text-zinc-700 dark:text-zinc-300">{message}</span>
-        </div>
-        <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-widest font-display text-zinc-500 dark:text-zinc-500">
-          <span
-            className={
-              challenge
-                ? 'text-orange-500'
-                : 'text-amber-500'
-            }
-          >
-            🔥 {a.streak_count} wins
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-xs font-display tracking-wider text-zinc-900 dark:text-zinc-100 truncate">
+            {a.display_name}
           </span>
-          <span className="text-zinc-400 dark:text-zinc-600">·</span>
-          <span>{formatRelative(a.created_at)}</span>
+          <span className="text-[9px] uppercase tracking-widest text-zinc-400 dark:text-zinc-600 shrink-0">
+            {formatRelative(a.created_at)}
+          </span>
+        </div>
+        <div
+          className={`text-[12px] leading-snug mt-0.5 ${
+            challenge
+              ? 'text-zinc-800 dark:text-zinc-200'
+              : 'text-zinc-700 dark:text-zinc-300'
+          }`}
+        >
+          {message}
         </div>
       </div>
     </li>
@@ -129,24 +129,24 @@ function Avatar({
 }) {
   const ringColor = intense ? '#f97316' : '#fbbf24';
   return (
-    <div className="relative shrink-0 w-10 h-10">
+    <div className="relative shrink-0 w-7 h-7 mt-0.5">
       <span
         className="absolute inset-0 rounded-full pointer-events-none"
         style={{
-          border: `2px solid ${ringColor}`,
-          boxShadow: `0 0 6px ${ringColor}`,
+          border: `1.5px solid ${ringColor}`,
+          boxShadow: `0 0 4px ${ringColor}`,
         }}
         aria-hidden
       />
-      <div className="relative z-10 w-10 h-10">
+      <div className="relative z-10 w-7 h-7">
         {avatarUrl ? (
           <img
             src={avatarUrl}
             alt=""
-            className="w-10 h-10 rounded-full object-cover border border-zinc-200 dark:border-zinc-700"
+            className="w-7 h-7 rounded-full object-cover border border-zinc-200 dark:border-zinc-700"
           />
         ) : (
-          <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center font-semibold">
+          <div className="w-7 h-7 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center text-[11px] font-semibold">
             {displayName?.[0]?.toUpperCase() ?? '?'}
           </div>
         )}
