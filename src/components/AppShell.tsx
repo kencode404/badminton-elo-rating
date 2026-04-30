@@ -28,9 +28,14 @@ export function AppShell() {
       >
         <div className="flex items-center justify-between">
           <h1 className="font-display tracking-[0.2em] text-base flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-            <span aria-hidden className="text-cyan2-500 dark:text-cyan2-300 inline-flex">
-              <Shuttlecock size={20} />
-            </span>
+            <img
+              src="/shuttlecock.png"
+              alt=""
+              width={22}
+              height={22}
+              className="dark:invert"
+              aria-hidden
+            />
             <span>BADMINTON ELO</span>
           </h1>
           <div className="flex items-center gap-1">
@@ -163,30 +168,6 @@ function CenterMatchTab() {
         </>
       )}
     </NavLink>
-  );
-}
-
-function Shuttlecock({ size = 20 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 64 64"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M16 5 L23 5 L27 35 L18 32 Z" />
-      <path d="M38 8 L45 14 L30 40 L23 34 Z" />
-      <path d="M56 24 L59 33 L30 42 L26 36 Z" />
-      <path d="M12 60 Q4 60 4 50 Q4 42 14 42 Q23 42 24 50 L21 60 Z" />
-      <line x1="8" y1="46" x2="10" y2="60" />
-      <line x1="13" y1="43" x2="15" y2="60" />
-      <line x1="18" y1="44" x2="19" y2="60" />
-    </svg>
   );
 }
 
