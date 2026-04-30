@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.svg', 'app-icon.svg'],
       manifest: {
         name: 'Badminton ELO',
         short_name: 'Badminton ELO',
@@ -20,10 +20,10 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: 'favicon.svg',
+            src: 'app-icon.svg',
             sizes: 'any',
             type: 'image/svg+xml',
-            purpose: 'any',
+            purpose: 'any maskable',
           },
         ],
       },

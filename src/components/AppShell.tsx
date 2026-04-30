@@ -28,7 +28,9 @@ export function AppShell() {
       >
         <div className="flex items-center justify-between">
           <h1 className="font-display tracking-[0.2em] text-base flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-            <span aria-hidden className="text-cyan2-500 dark:text-cyan2-300">◆</span>
+            <span aria-hidden className="text-cyan2-500 dark:text-cyan2-300 inline-flex">
+              <Shuttlecock size={20} />
+            </span>
             <span>BADMINTON ELO</span>
           </h1>
           <div className="flex items-center gap-1">
@@ -100,6 +102,10 @@ function FlatTab({ item }: { item: NavItem }) {
 }
 
 function CenterMatchTab() {
+  // Rounder 16-spike comic burst (less jagged variation than before).
+  // Outer radius 50%, inner radius 40%.
+  const burstClip =
+    'polygon(50% 0%, 58% 11%, 69% 4%, 72% 17%, 85% 15%, 83% 28%, 96% 31%, 89% 42%, 100% 50%, 89% 58%, 96% 69%, 83% 72%, 85% 85%, 72% 83%, 69% 96%, 58% 89%, 50% 100%, 42% 89%, 31% 96%, 28% 83%, 15% 85%, 17% 72%, 4% 69%, 11% 58%, 0% 50%, 11% 42%, 4% 31%, 17% 28%, 15% 15%, 28% 17%, 31% 4%, 42% 11%)';
   return (
     <NavLink
       to="/record"
@@ -114,22 +120,70 @@ function CenterMatchTab() {
       {({ isActive }) => (
         <>
           <span
-            className="absolute left-1/2 -translate-x-1/2 -top-6 w-14 h-14 rounded-full flex items-center justify-center text-white border transition active:scale-95"
+            className="absolute left-1/2 -translate-x-1/2 -top-9 w-[76px] h-[76px] transition active:scale-95"
             style={{
-              background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)',
-              borderColor: isActive ? 'rgba(103, 232, 249, 0.9)' : 'rgba(34, 211, 238, 0.45)',
-              boxShadow: isActive
-                ? '0 0 22px rgba(34, 211, 238, 0.7)'
-                : '0 0 14px rgba(34, 211, 238, 0.4)',
+              filter: isActive
+                ? 'drop-shadow(0 0 14px rgba(34,211,238,0.9)) drop-shadow(0 0 4px rgba(34,211,238,0.7))'
+                : 'drop-shadow(0 0 10px rgba(34,211,238,0.55)) drop-shadow(0 0 3px rgba(34,211,238,0.5))',
             }}
             aria-hidden
           >
-            <MatchIcon />
+            {/* cyan outer 'stroke' — the burst silhouette in cyan */}
+            <span
+              className="absolute inset-0"
+              style={{
+                clipPath: burstClip,
+                background: isActive ? '#67e8f9' : '#22d3ee',
+              }}
+            />
+            {/* dark fill, slightly inset to leave a thin cyan rim */}
+            <span
+              className="absolute inset-[2px]"
+              style={{
+                clipPath: burstClip,
+                background: 'linear-gradient(135deg, #0f0f12 0%, #27272a 100%)',
+              }}
+            />
+            {/* SMASH! text — on top of both, NOT clipped, fully visible */}
+            <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span
+                className="font-display italic font-black tracking-tight leading-none text-cyan2-300 select-none"
+                style={{
+                  fontSize: '13px',
+                  textShadow:
+                    '0 0 6px rgba(34,211,238,0.7), 0 1px 0 rgba(0,0,0,0.6)',
+                  transform: 'rotate(-6deg)',
+                }}
+              >
+                SMASH!
+              </span>
+            </span>
           </span>
           <span className="uppercase text-[10px] mt-1">Match</span>
         </>
       )}
     </NavLink>
+  );
+}
+
+function Shuttlecock({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      fill="currentColor"
+      aria-hidden
+    >
+      <g transform="rotate(35 32 32)">
+        <path d="M32 4 L28 38 L36 38 Z" />
+        <path d="M20 7 L26 38 L30 38 Z" />
+        <path d="M9 16 L24 38 L28 39 Z" />
+        <path d="M44 7 L38 38 L34 38 Z" />
+        <path d="M55 16 L40 38 L36 39 Z" />
+        <path d="M26 42 L26 54 Q26 60 32 60 Q38 60 38 54 L38 42 Z" />
+      </g>
+    </svg>
   );
 }
 
@@ -172,34 +226,6 @@ function RanksIcon() {
       <path d="M9 14v2a3 3 0 0 1-3 3" />
       <path d="M15 14v2a3 3 0 0 0 3 3" />
       <path d="M6 20h12" />
-    </svg>
-  );
-}
-
-function MatchIcon() {
-  return (
-    <svg
-      width="26"
-      height="26"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      {/* shuttlecock shaft (cork → feather end) on a smash diagonal */}
-      <path d="M17 7 L10.5 13.5" />
-      {/* feather flare: V opening behind the shaft */}
-      <path d="M8.5 11.5 L10.5 13.5 L12.5 15.5" />
-      <path d="M7.5 14.5 L10.5 13.5 L9.5 16.5" />
-      {/* cork (heavy hitting end) */}
-      <circle cx="17" cy="7" r="1.9" fill="currentColor" stroke="none" />
-      {/* motion / speed lines trailing the smash */}
-      <path d="M3 20 L5.5 17.5" />
-      <path d="M2.5 16 L4 14.5" />
-      <path d="M5 21.5 L6.5 20" />
     </svg>
   );
 }
