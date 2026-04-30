@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
 import { NotificationBell } from './NotificationBell';
+import { useChatUnread } from '../lib/chat';
 
 interface NavItem {
   to: string;
@@ -73,6 +74,8 @@ export function AppShell() {
 }
 
 function FlatTab({ item }: { item: NavItem }) {
+  const unread = useChatUnread();
+  const showHomeBadge = item.to === '/' && unread > 0;
   return (
     <NavLink
       to={item.to}
@@ -95,12 +98,20 @@ function FlatTab({ item }: { item: NavItem }) {
             />
           )}
           <span
-            className={`mb-0.5 flex items-center justify-center h-5 ${
+            className={`mb-0.5 flex items-center justify-center h-5 relative ${
               isActive ? 'text-cyan2-400' : ''
             }`}
             aria-hidden
           >
             {item.icon}
+            {showHomeBadge && (
+              <span
+                className="absolute -top-1 -right-2 min-w-[14px] h-[14px] px-1 rounded-full bg-cyan2-400 text-zinc-900 text-[9px] flex items-center justify-center font-bold"
+                style={{ boxShadow: '0 0 6px rgba(34, 211, 238, 0.7)' }}
+              >
+                {unread > 9 ? '9+' : unread}
+              </span>
+            )}
           </span>
           <span className="uppercase text-[10px]">{item.label}</span>
         </>

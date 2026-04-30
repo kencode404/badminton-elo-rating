@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../lib/auth';
+import { markChatSeen } from '../lib/chat';
 import type { Database, MatchType } from '../lib/database.types';
 
 interface AnnouncementRow {
@@ -13,7 +15,13 @@ interface AnnouncementRow {
 }
 
 export function HomePage() {
+  const { user } = useAuth();
   const [announcements, setAnnouncements] = useState<AnnouncementRow[] | null>(null);
+
+  // Mark chat as seen for the current user (clears the home-button badge).
+  useEffect(() => {
+    if (user) markChatSeen(user.id);
+  }, [user]);
 
   useEffect(() => {
     let active = true;
@@ -118,21 +126,20 @@ function SystemAnnouncement({ a }: { a: AnnouncementRow }) {
     : 'text-amber-500 dark:text-amber-400';
 
   return (
-    <li className="flex justify-center">
-      <div
-        className={`max-w-[90%] flex items-start gap-1.5 rounded-full px-3 py-1.5 text-[11px] leading-snug ${
-          challenge
-            ? 'bg-orange-500/10 dark:bg-orange-500/15'
-            : 'bg-amber-500/10 dark:bg-amber-500/15'
-        }`}
-      >
-        <span className={`shrink-0 font-display tracking-widest text-[9px] uppercase ${accent}`}>
-          system
-        </span>
-        <span className="text-zinc-700 dark:text-zinc-200">{message}</span>
-        <span className="shrink-0 text-[9px] text-zinc-400 dark:text-zinc-600 ml-1 mt-px">
-          {formatRelative(a.created_at)}
-        </span>
+    <li className="flex justify-start">
+      <div className="max-w-[88%] flex flex-col items-start gap-0.5">
+        <div className={`text-[9px] font-display uppercase tracking-widest ${accent}`}>
+          System · {formatRelative(a.created_at)}
+        </div>
+        <div
+          className={`rounded-2xl rounded-bl-md px-3 py-1.5 text-[12px] leading-snug ${
+            challenge
+              ? 'bg-orange-500/10 dark:bg-orange-500/15 text-zinc-800 dark:text-zinc-100'
+              : 'bg-amber-500/10 dark:bg-amber-500/15 text-zinc-800 dark:text-zinc-100'
+          }`}
+        >
+          {message}
+        </div>
       </div>
     </li>
   );

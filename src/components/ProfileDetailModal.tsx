@@ -91,14 +91,22 @@ export function ProfileDetailModal({ userId, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm p-4"
+      style={{
+        paddingTop: 'max(2rem, env(safe-area-inset-top))',
+        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+      }}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label="Player details"
     >
       <div
-        className="glass-panel w-full max-w-md max-h-[85vh] overflow-y-auto"
+        className="glass-panel w-full max-w-md flex flex-col rounded-2xl overflow-hidden"
+        style={{
+          maxHeight:
+            'calc(100dvh - 3rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-center justify-between px-4 py-3 border-b border-zinc-200/60 dark:border-zinc-800/60">
@@ -150,9 +158,9 @@ export function ProfileDetailModal({ userId, onClose }: Props) {
           />
         </section>
 
-        {/* Recent matches */}
-        <section className="p-4">
-          <div className="section-title mb-3">Last 5 Matches</div>
+        {/* Recent matches — scrolls internally so the modal stays compact */}
+        <section className="px-4 pb-4 pt-3 flex flex-col min-h-0 flex-1">
+          <div className="section-title mb-2 shrink-0">Last 5 Matches</div>
           {matches === null ? (
             <p className="text-xs text-zinc-500 dark:text-zinc-500">Loading…</p>
           ) : matches.length === 0 ? (
@@ -160,7 +168,7 @@ export function ProfileDetailModal({ userId, onClose }: Props) {
               No confirmed matches yet.
             </p>
           ) : (
-            <ul className="space-y-1.5">
+            <ul className="space-y-1.5 overflow-y-auto" style={{ maxHeight: '11rem' }}>
               {matches.map((m) => (
                 <RecentMatchRow key={m.match_id} match={m} />
               ))}

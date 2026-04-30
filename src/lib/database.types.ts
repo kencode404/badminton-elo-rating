@@ -19,6 +19,7 @@ export interface Database {
           singles_games_played: number;
           doubles_games_played: number;
           created_at: string;
+          chat_last_seen_at: string;
         };
         Insert: {
           id: string;
@@ -28,6 +29,7 @@ export interface Database {
           doubles_rating?: number;
           singles_games_played?: number;
           doubles_games_played?: number;
+          chat_last_seen_at?: string;
         };
         Update: {
           display_name?: string;
@@ -36,6 +38,7 @@ export interface Database {
           doubles_rating?: number;
           singles_games_played?: number;
           doubles_games_played?: number;
+          chat_last_seen_at?: string;
         };
         Relationships: [];
       };
