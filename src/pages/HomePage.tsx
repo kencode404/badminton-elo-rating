@@ -68,90 +68,73 @@ export function HomePage() {
         </p>
       </section>
 
-      {announcements && announcements.length > 0 && (
-        <section className="glass-panel p-3">
-          <div className="section-title px-1 pb-2 text-[11px]">Streak Feed</div>
-          <ul className="space-y-1 max-h-72 overflow-y-auto pr-1">
-            {announcements.map((a) => (
-              <AnnouncementItem key={a.id} a={a} />
-            ))}
-          </ul>
-        </section>
-      )}
+      <section className="glass-panel overflow-hidden">
+        <header className="flex items-center justify-between px-3 py-2 border-b border-zinc-200/60 dark:border-zinc-800/60">
+          <div className="flex items-center gap-2">
+            <span className="text-cyan2-500 dark:text-cyan2-300 text-base" aria-hidden>
+              💬
+            </span>
+            <span className="font-display text-[11px] uppercase tracking-widest text-zinc-700 dark:text-zinc-200">
+              Club Chat
+            </span>
+          </div>
+          <span className="text-[9px] uppercase tracking-widest font-display text-zinc-400 dark:text-zinc-600">
+            beta · system only
+          </span>
+        </header>
+
+        <ul className="space-y-2 max-h-80 overflow-y-auto px-3 py-3">
+          {announcements && announcements.length > 0 ? (
+            announcements.map((a) => <SystemAnnouncement key={a.id} a={a} />)
+          ) : (
+            <li className="text-center text-[11px] text-zinc-500 dark:text-zinc-500 py-6">
+              No streaks right now — be the first to start one.
+            </li>
+          )}
+        </ul>
+
+        <footer className="border-t border-zinc-200/60 dark:border-zinc-800/60 px-3 py-2">
+          <div
+            className="w-full px-3 py-2 rounded-lg text-xs text-zinc-400 dark:text-zinc-600 bg-zinc-100/70 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 select-none cursor-not-allowed"
+            aria-disabled
+          >
+            Chat coming soon…
+          </div>
+        </footer>
+      </section>
     </div>
   );
 }
 
-function AnnouncementItem({ a }: { a: AnnouncementRow }) {
+// System (bot) announcement message — centred chat style, distinct
+// from future user messages.
+function SystemAnnouncement({ a }: { a: AnnouncementRow }) {
   const challenge = a.streak_count >= 3;
   const message = challenge
-    ? `${a.streak_count}-match ${a.match_type} streak 🔥 who's gonna stop them?`
-    : `2-match ${a.match_type} streak — nice 🔥`;
+    ? `${a.display_name} is on a ${a.streak_count}-match ${a.match_type} streak 🔥 who's gonna take them down?`
+    : `${a.display_name} just hit a 2-match ${a.match_type} streak. Nice 🔥`;
+  const accent = challenge
+    ? 'text-orange-500 dark:text-orange-400'
+    : 'text-amber-500 dark:text-amber-400';
 
   return (
-    <li className="flex items-start gap-2 px-1 py-1.5">
-      <Avatar
-        avatarUrl={a.avatar_url}
-        displayName={a.display_name}
-        intense={challenge}
-      />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-xs font-display tracking-wider text-zinc-900 dark:text-zinc-100 truncate">
-            {a.display_name}
-          </span>
-          <span className="text-[9px] uppercase tracking-widest text-zinc-400 dark:text-zinc-600 shrink-0">
-            {formatRelative(a.created_at)}
-          </span>
-        </div>
-        <div
-          className={`text-[12px] leading-snug mt-0.5 ${
-            challenge
-              ? 'text-zinc-800 dark:text-zinc-200'
-              : 'text-zinc-700 dark:text-zinc-300'
-          }`}
-        >
-          {message}
-        </div>
+    <li className="flex justify-center">
+      <div
+        className={`max-w-[90%] flex items-start gap-1.5 rounded-full px-3 py-1.5 text-[11px] leading-snug ${
+          challenge
+            ? 'bg-orange-500/10 dark:bg-orange-500/15'
+            : 'bg-amber-500/10 dark:bg-amber-500/15'
+        }`}
+      >
+        <span className={`shrink-0 font-display tracking-widest text-[9px] uppercase ${accent}`}>
+          system
+        </span>
+        <span className="text-zinc-700 dark:text-zinc-200">{message}</span>
+        <span className="shrink-0 text-[9px] text-zinc-400 dark:text-zinc-600 ml-1 mt-px">
+          {formatRelative(a.created_at)}
+        </span>
       </div>
     </li>
-  );
-}
-
-function Avatar({
-  avatarUrl,
-  displayName,
-  intense,
-}: {
-  avatarUrl: string | null;
-  displayName: string;
-  intense: boolean;
-}) {
-  const ringColor = intense ? '#f97316' : '#fbbf24';
-  return (
-    <div className="relative shrink-0 w-7 h-7 mt-0.5">
-      <span
-        className="absolute inset-0 rounded-full pointer-events-none"
-        style={{
-          border: `1.5px solid ${ringColor}`,
-          boxShadow: `0 0 4px ${ringColor}`,
-        }}
-        aria-hidden
-      />
-      <div className="relative z-10 w-7 h-7">
-        {avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt=""
-            className="w-7 h-7 rounded-full object-cover border border-zinc-200 dark:border-zinc-700"
-          />
-        ) : (
-          <div className="w-7 h-7 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center text-[11px] font-semibold">
-            {displayName?.[0]?.toUpperCase() ?? '?'}
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
 
