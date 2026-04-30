@@ -159,7 +159,7 @@ function CenterMatchTab() {
               </span>
             </span>
           </span>
-          <span className="uppercase text-[10px] mt-1">Match</span>
+          <span className="relative z-10 uppercase text-[10px] mt-1">Match</span>
         </>
       )}
     </NavLink>
@@ -175,13 +175,13 @@ function Shuttlecock({ size = 20 }: { size?: number }) {
       fill="currentColor"
       aria-hidden
     >
-      <g transform="rotate(35 32 32)">
-        <path d="M32 4 L28 38 L36 38 Z" />
-        <path d="M20 7 L26 38 L30 38 Z" />
-        <path d="M9 16 L24 38 L28 39 Z" />
-        <path d="M44 7 L38 38 L34 38 Z" />
-        <path d="M55 16 L40 38 L36 39 Z" />
-        <path d="M26 42 L26 54 Q26 60 32 60 Q38 60 38 54 L38 42 Z" />
+      <ellipse cx="14" cy="50" rx="9" ry="7" transform="rotate(-25 14 50)" />
+      <g transform="translate(22 42)">
+        <path d="M0 0 Q4 -16 0 -34 Q-4 -16 0 0 Z" transform="rotate(0)" />
+        <path d="M0 0 Q4 -16 0 -34 Q-4 -16 0 0 Z" transform="rotate(20)" />
+        <path d="M0 0 Q4 -16 0 -34 Q-4 -16 0 0 Z" transform="rotate(40)" />
+        <path d="M0 0 Q4 -16 0 -34 Q-4 -16 0 0 Z" transform="rotate(60)" />
+        <path d="M0 0 Q4 -16 0 -34 Q-4 -16 0 0 Z" transform="rotate(80)" />
       </g>
     </svg>
   );

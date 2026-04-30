@@ -1,14 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" aria-hidden="true">
+  <!-- dark rounded background -->
   <rect width="80" height="80" rx="16" fill="#0a0a0c"/>
+  <!-- subtle cyan glow -->
   <circle cx="40" cy="40" r="34" fill="#22d3ee" opacity="0.08"/>
+  <!-- shuttlecock in cyan, centered with padding -->
   <g fill="#67e8f9" transform="translate(8 8)">
-    <g transform="rotate(35 32 32)">
-      <path d="M32 4 L28 38 L36 38 Z"/>
-      <path d="M20 7 L26 38 L30 38 Z"/>
-      <path d="M9 16 L24 38 L28 39 Z"/>
-      <path d="M44 7 L38 38 L34 38 Z"/>
-      <path d="M55 16 L40 38 L36 39 Z"/>
-      <path d="M26 42 L26 54 Q26 60 32 60 Q38 60 38 54 L38 42 Z"/>
+    <ellipse cx="14" cy="50" rx="9" ry="7" transform="rotate(-25 14 50)"/>
+    <g transform="translate(22 42)">
+      <path d="M0 0 Q4 -16 0 -34 Q-4 -16 0 0 Z" transform="rotate(0)"/>
+      <path d="M0 0 Q4 -16 0 -34 Q-4 -16 0 0 Z" transform="rotate(20)"/>
+      <path d="M0 0 Q4 -16 0 -34 Q-4 -16 0 0 Z" transform="rotate(40)"/>
+      <path d="M0 0 Q4 -16 0 -34 Q-4 -16 0 0 Z" transform="rotate(60)"/>
+      <path d="M0 0 Q4 -16 0 -34 Q-4 -16 0 0 Z" transform="rotate(80)"/>
     </g>
   </g>
 </svg>
