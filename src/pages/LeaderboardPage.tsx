@@ -11,6 +11,7 @@ export function LeaderboardPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('doubles');
   const [rows, setRows] = useState<Profile[] | null>(null);
+  const [streaks, setStreaks] = useState<Map<string, number>>(new Map());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,6 +36,28 @@ export function LeaderboardPage() {
       active = false;
     };
   }, [tab]);
+
+  // Streaks are mode-agnostic (per-player across both modes), so fetch once.
+  useEffect(() => {
+    let active = true;
+    supabase
+      .rpc('get_win_streaks')
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          // Non-fatal — leaderboard still works without streak badges.
+          return;
+        }
+        const map = new Map<string, number>();
+        for (const row of (data ?? []) as { user_id: string; streak: number }[]) {
+          map.set(row.user_id, row.streak);
+        }
+        setStreaks(map);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="p-4 space-y-4">
@@ -80,6 +103,7 @@ export function LeaderboardPage() {
               profile={p}
               tab={tab}
               isMe={user?.id === p.id}
+              streak={streaks.get(p.id) ?? 0}
             />
           ))}
         </ol>
@@ -93,11 +117,13 @@ function Row({
   profile,
   tab,
   isMe,
+  streak,
 }: {
   rank: number;
   profile: Profile;
   tab: Tab;
   isMe: boolean;
+  streak: number;
 }) {
   const rating = tab === 'singles' ? profile.singles_rating : profile.doubles_rating;
   const games = tab === 'singles' ? profile.singles_games_played : profile.doubles_games_played;
@@ -113,17 +139,29 @@ function Row({
         {medal ?? `#${rank}`}
       </div>
 
-      <Avatar profile={profile} />
+      <Avatar profile={profile} streak={streak} />
 
       <div className="flex-1 min-w-0">
         <div
-          className={`text-sm truncate ${
+          className={`text-sm truncate flex items-center gap-1 ${
             isMe
               ? 'font-display tracking-wide uppercase text-cyan2-600 dark:text-cyan2-300'
               : 'text-zinc-900 dark:text-zinc-100'
           }`}
         >
-          {profile.display_name}
+          <span className="truncate">{profile.display_name}</span>
+          {streak >= 2 && (
+            <span
+              className={`text-[10px] font-display tracking-wider px-1.5 py-0.5 rounded shrink-0 ${
+                streak >= 3
+                  ? 'bg-orange-500/15 text-orange-500'
+                  : 'bg-amber-500/10 text-amber-500'
+              }`}
+              title={`${streak}-win streak`}
+            >
+              {streak}W
+            </span>
+          )}
           {isMe && <span className="text-[9px] tracking-widest ml-1">· you</span>}
         </div>
         <div className="text-[10px] text-zinc-500 dark:text-zinc-500 tracking-wider uppercase">
@@ -143,19 +181,48 @@ function Row({
   );
 }
 
-function Avatar({ profile }: { profile: Profile }) {
-  if (profile.avatar_url) {
-    return (
-      <img
-        src={profile.avatar_url}
-        alt=""
-        className="w-9 h-9 rounded-full object-cover border border-zinc-200 dark:border-zinc-700 shrink-0"
-      />
-    );
-  }
+function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
+  // Streak ring: amber at 2 wins, brighter orange + pulse + bigger flame at 3+.
+  const ringClass =
+    streak >= 3
+      ? 'ring-2 ring-orange-500'
+      : streak >= 2
+        ? 'ring-2 ring-amber-400'
+        : '';
+  const ringStyle =
+    streak >= 3
+      ? { boxShadow: '0 0 10px rgba(249, 115, 22, 0.65)' }
+      : streak >= 2
+        ? { boxShadow: '0 0 6px rgba(251, 191, 36, 0.5)' }
+        : undefined;
+
   return (
-    <div className="w-9 h-9 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center font-semibold shrink-0">
-      {profile.display_name?.[0]?.toUpperCase() ?? '?'}
+    <div className="relative shrink-0">
+      {profile.avatar_url ? (
+        <img
+          src={profile.avatar_url}
+          alt=""
+          className={`w-9 h-9 rounded-full object-cover border border-zinc-200 dark:border-zinc-700 ${ringClass}`}
+          style={ringStyle}
+        />
+      ) : (
+        <div
+          className={`w-9 h-9 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center font-semibold ${ringClass}`}
+          style={ringStyle}
+        >
+          {profile.display_name?.[0]?.toUpperCase() ?? '?'}
+        </div>
+      )}
+      {streak >= 2 && (
+        <span
+          className={`absolute -top-1 -right-1 leading-none select-none ${
+            streak >= 3 ? 'text-base animate-pulse' : 'text-[11px]'
+          }`}
+          aria-hidden
+        >
+          🔥
+        </span>
+      )}
     </div>
   );
 }
