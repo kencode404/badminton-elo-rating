@@ -164,6 +164,9 @@ declare
   k_established constant int := 24;
   provisional_games constant int := 10;
   elo_divisor constant numeric := 400;
+  margin_deadband constant int := 2;
+  margin_divisor constant numeric := 21;
+  margin_max_mult constant numeric := 2;
   rating_a numeric;
   rating_b numeric;
   expected_a numeric;
@@ -175,10 +178,14 @@ declare
   participant record;
   current_rating int;
   current_games int;
-  k int;
+  base_k int;
+  effective_k numeric;
   team_actual numeric;
   team_expected numeric;
   delta int;
+  score_diff int;
+  margin_mult numeric;
+  winning_team match_team;
 begin
   select * into m from public.matches where id = p_match_id for update;
   if not found or m.status <> 'pending' then
@@ -223,9 +230,15 @@ begin
 
   if m.score_a > m.score_b then
     actual_a := 1; actual_b := 0;
+    winning_team := 'A';
   else
     actual_a := 0; actual_b := 1;
+    winning_team := 'B';
   end if;
+
+  -- Margin-of-victory multiplier (winner only).
+  score_diff := abs(m.score_a - m.score_b);
+  margin_mult := least(margin_max_mult, 1 + greatest(0, score_diff - margin_deadband)::numeric / margin_divisor);
 
   -- Loop participants, compute per-player delta with their personal K.
   for participant in
@@ -234,7 +247,13 @@ begin
     execute format('select %I, %I from public.profiles where id = $1', rating_col, games_col)
       using participant.user_id into current_rating, current_games;
 
-    k := case when current_games < provisional_games then k_provisional else k_established end;
+    base_k := case when current_games < provisional_games then k_provisional else k_established end;
+
+    if participant.team = winning_team then
+      effective_k := base_k * margin_mult;
+    else
+      effective_k := base_k;
+    end if;
 
     if participant.team = 'A' then
       team_actual := actual_a; team_expected := expected_a;
@@ -242,7 +261,7 @@ begin
       team_actual := actual_b; team_expected := expected_b;
     end if;
 
-    delta := round(k * (team_actual - team_expected));
+    delta := round(effective_k * (team_actual - team_expected));
 
     update public.match_participants
        set rating_before = current_rating,
@@ -257,7 +276,7 @@ begin
   end loop;
 
   update public.matches
-     set status = 'confirmed', confirmed_at = now()
+     set status = 'confirmed', confirmed_at = now(), elo_version = 2
    where id = p_match_id;
 end;
 $$;

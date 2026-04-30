@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { AvatarCropModal } from '../components/AvatarCropModal';
@@ -226,6 +227,34 @@ export function ProfilePage() {
           Past matches and rating changes will appear here.
         </p>
       </section>
+
+      <Link
+        to="/scoring-guide"
+        className="glass-panel w-full p-4 flex items-center justify-between hover:border-cyan2-400/60 transition group"
+      >
+        <div className="flex items-center gap-3">
+          <span
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-cyan2-500 dark:text-cyan2-300 border border-cyan2-400/40"
+            style={{
+              background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)',
+            }}
+            aria-hidden
+          >
+            ?
+          </span>
+          <div className="text-left">
+            <div className="text-[10px] font-display uppercase tracking-widest text-cyan2-500 dark:text-cyan2-300">
+              Help
+            </div>
+            <div className="text-sm text-zinc-900 dark:text-zinc-100">
+              How ratings work
+            </div>
+          </div>
+        </div>
+        <span className="text-zinc-400 dark:text-zinc-600 group-hover:text-cyan2-500 transition" aria-hidden>
+          →
+        </span>
+      </Link>
 
       <button
         type="button"

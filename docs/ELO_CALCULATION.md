@@ -29,6 +29,9 @@ All constants are exported from [`src/lib/elo.ts`](../src/lib/elo.ts). To change
 | `PROVISIONAL_GAMES`   | 10    | Number of games (per rating type) before a player is "established".    |
 | `ELO_DIVISOR`         | 400   | Standard ELO scaling factor in the expected-score formula.             |
 | `MATCH_EXPIRY_DAYS`   | 7     | A pending match auto-expires after this many days. No rating change.   |
+| `MARGIN_DEADBAND`     | 2     | Score differences ≤ this trigger no margin-of-victory boost.           |
+| `MARGIN_DIVISOR`      | 21    | Slope of the margin multiplier above the deadband.                     |
+| `MARGIN_MAX_MULT`     | 2     | Hard cap on the winner's K multiplier from a blowout.                  |
 
 ### Why these values
 
@@ -64,13 +67,29 @@ Ties are not currently supported — badminton matches always have a winner.
 
 ### 3.3 Rating update
 
-For each player (using their own K-factor):
+For each player, an *effective* K is computed:
+
+- **Loser:** $K_{\text{eff}} = K_{\text{base}}$ (no boost)
+- **Winner:** $K_{\text{eff}} = K_{\text{base}} \cdot M$, where $M$ is the margin multiplier
+
+Then the delta is:
 
 $$
-R_A' = R_A + K_A \cdot (S_A - E_A)
+R_A' = R_A + K_{\text{eff}} \cdot (S_A - E_A)
 $$
 
 The delta is rounded to the nearest integer before being stored. Ratings are stored as integers.
+
+### 3.3.1 Margin-of-victory multiplier (winner only)
+
+$$
+M = \min\left(2,\; 1 + \frac{\max(0,\; |s_A - s_B| - 2)}{21}\right)
+$$
+
+So a 21–19 game (diff 2) gives $M = 1$ and behaves exactly like classic ELO.
+A 21–2 thrashing (diff 19) gives $M \approx 1.81$. A theoretical infinite gap caps at 2.
+
+The multiplier applies to the **winning team's** K only; the losing team always uses base K. As a consequence the system is no longer strictly zero-sum: every match injects a small amount of rating into the pool. Over thousands of matches the average rating drifts up slowly, but rankings stay correct.
 
 ### 3.4 K-factor selection (per player, per rating type)
 
@@ -210,3 +229,4 @@ If you're changing the *formula* (not just constants), also:
 | Date       | Change                                  | Reason                                    |
 | ---------- | --------------------------------------- | ----------------------------------------- |
 | 2026-04-29 | Initial system: K=40→24 after 10 games, start 1200, equal-split doubles, single-number scores, 7-day expiry. | App launch with 5–10 player group. |
+| 2026-04-30 | ELO_VERSION 1 → 2. Winner-only margin-of-victory multiplier added: `K_eff = K_base × min(2, 1 + max(0, diff − 2)/21)`. Loser keeps base K. | User feedback that a 21-2 win and a 21-19 win shouldn't reward identically. |
