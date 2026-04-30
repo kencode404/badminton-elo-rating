@@ -216,48 +216,54 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
   );
 }
 
-// Fire halo wrapping the avatar in stylised flame tongues.
-// A linear gradient (yellow tip → orange middle → red base) is applied
-// to each individual tongue, then a subtle feTurbulence flicker makes
-// the edges shimmer. The whole halo slowly spins, hot-wheels style.
+// Cartoon comet-trail fire halo. Asymmetric: most tongues cluster around
+// the upper-right (the "trail" direction), with a few smaller wisps on
+// the opposite side wrapping the avatar. Each tongue is built from three
+// stacked paths — red outer outline, orange middle, yellow inner highlight —
+// so it reads like a chunky comic-book flame. A subtle feTurbulence
+// flicker shimmers the edges; the whole halo slowly spins.
 function FlameHalo({ intense }: { intense: boolean }) {
   const id = useId().replace(/:/g, '');
   const filterId = `flame-f-${id}`;
-  const gradId = `flame-g-${id}`;
-  // Halo extends ~14px outside the 36px avatar to give the tongue tips room.
-  const haloPx = 64;
+
+  // Halo box is much larger than the avatar so the trail can extend far.
+  const haloPx = 96;
   const offset = (haloPx - 36) / 2;
 
-  // Each entry: angle around the avatar, and a relative tongue length
-  // (1 = base, 1.3 = longer tongue). Alternating long/short keeps it
-  // organic-looking. Intense streaks add a second offset ring with
-  // shorter tongues filling the gaps.
-  const baseTongues: { angle: number; len: number }[] = [
-    { angle: 0, len: 1.25 },
-    { angle: 45, len: 1.0 },
-    { angle: 90, len: 1.25 },
-    { angle: 135, len: 1.0 },
-    { angle: 180, len: 1.25 },
-    { angle: 225, len: 1.0 },
-    { angle: 270, len: 1.25 },
-    { angle: 315, len: 1.0 },
-  ];
-  const innerTongues: { angle: number; len: number }[] = [
-    { angle: 22.5, len: 0.8 },
-    { angle: 67.5, len: 0.8 },
-    { angle: 112.5, len: 0.8 },
-    { angle: 157.5, len: 0.8 },
-    { angle: 202.5, len: 0.8 },
-    { angle: 247.5, len: 0.8 },
-    { angle: 292.5, len: 0.8 },
-    { angle: 337.5, len: 0.8 },
-  ];
-  const tongues = intense ? [...baseTongues, ...innerTongues] : baseTongues;
+  // Each tongue: angle around the avatar (0 = up; positive = clockwise),
+  // and a length scale (Y stretch). Big tongues cluster upper-right;
+  // small wisps trail behind on the lower-left.
+  const tongues: { angle: number; len: number }[] = intense
+    ? [
+        { angle: -10, len: 1.35 },
+        { angle: 25, len: 1.7 },   // trail tip — biggest
+        { angle: 55, len: 1.45 },
+        { angle: 85, len: 1.15 },
+        { angle: 120, len: 0.85 },
+        { angle: 160, len: 0.7 },
+        { angle: 210, len: 0.7 },
+        { angle: 250, len: 0.85 },
+        { angle: 290, len: 1.0 },
+        { angle: 325, len: 1.2 },  // back end of trail circle
+      ]
+    : [
+        { angle: -5, len: 1.25 },
+        { angle: 30, len: 1.55 },  // trail tip
+        { angle: 65, len: 1.3 },
+        { angle: 100, len: 1.0 },
+        { angle: 200, len: 0.65 }, // small wisp far side
+        { angle: 270, len: 0.85 }, // small wisp far side
+        { angle: 320, len: 1.0 },
+      ];
 
-  // Tongue path in local coords: base at (0,0), tip at (0,-18), wider at
-  // base and curving in toward a sharp tip.
-  const tonguePath =
-    'M -3 0 Q -4 -8 -1 -16 Q 0 -19 1 -16 Q 4 -8 3 0 Z';
+  // Three nested cartoon-flame paths (outer → middle → inner). Each has a
+  // chunky base curving up to multiple peaks (the "licks").
+  const outerPath =
+    'M -11 0 C -13 -8 -11 -16 -8 -17 Q -5 -25 -3 -17 Q -1 -29 1 -17 Q 3 -27 6 -17 Q 9 -22 11 -17 C 13 -10 13 -2 11 0 Z';
+  const middlePath =
+    'M -8 0 C -9 -6 -8 -12 -5.5 -13 Q -3.5 -20 -2 -13 Q -0.5 -23 0.5 -13 Q 2 -22 4 -13 Q 6 -17 7.5 -13 C 9 -7 9 -2 7.5 0 Z';
+  const innerPath =
+    'M -4.5 0 C -5 -4 -4 -8 -3 -9 Q -1.8 -14 -1 -9 Q -0.3 -16 0.3 -9 Q 1 -15 2 -9 Q 3 -12 4 -9 C 4.8 -5 4.8 -2 4 0 Z';
 
   return (
     <svg
@@ -269,24 +275,16 @@ function FlameHalo({ intense }: { intense: boolean }) {
         left: -offset,
         top: -offset,
         animation: intense
-          ? 'flame-spin 6s linear infinite'
-          : 'flame-spin 12s linear infinite',
+          ? 'flame-spin 7s linear infinite'
+          : 'flame-spin 14s linear infinite',
       }}
       aria-hidden
     >
       <defs>
-        {/* Flame gradient: tip = yellow, middle = orange, base = red. */}
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#fde047" />
-          <stop offset="35%" stopColor="#f97316" />
-          <stop offset="100%" stopColor="#dc2626" />
-        </linearGradient>
-        {/* Subtle flicker — much smaller scale than before so the
-            tongue silhouette stays readable. */}
-        <filter id={filterId} x="-15%" y="-15%" width="130%" height="130%">
+        <filter id={filterId} x="-10%" y="-10%" width="120%" height="120%">
           <feTurbulence
             type="fractalNoise"
-            baseFrequency="0.12"
+            baseFrequency="0.16"
             numOctaves="2"
             seed="2"
             result="noise"
@@ -299,18 +297,23 @@ function FlameHalo({ intense }: { intense: boolean }) {
               repeatCount="indefinite"
             />
           </feTurbulence>
-          <feDisplacementMap in="SourceGraphic" in2="noise" scale={intense ? 4 : 2.5} />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale={intense ? 3 : 2} />
         </filter>
       </defs>
       <g filter={`url(#${filterId})`}>
-        {tongues.map((t, i) => (
-          <path
-            key={i}
-            d={tonguePath}
-            fill={`url(#${gradId})`}
-            transform={`translate(50 50) rotate(${t.angle}) translate(0 -22) scale(1 ${t.len})`}
-          />
-        ))}
+        {tongues.map((t, i) => {
+          const transform = `translate(50 50) rotate(${t.angle}) translate(0 -20) scale(1 ${t.len})`;
+          return (
+            <g key={i} transform={transform}>
+              {/* outer red */}
+              <path d={outerPath} fill="#b91c1c" />
+              {/* middle orange */}
+              <path d={middlePath} fill="#f97316" />
+              {/* inner yellow highlight */}
+              <path d={innerPath} fill="#fde047" />
+            </g>
+          );
+        })}
       </g>
     </svg>
   );
