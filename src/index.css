@@ -18,11 +18,11 @@
     transform: rotate(var(--spark-rotate)) translateY(-18px);
     opacity: 0;
   }
-  20% {
+  25% {
     opacity: 1;
   }
   100% {
-    transform: rotate(var(--spark-rotate)) translateY(-30px);
+    transform: rotate(var(--spark-rotate)) translateY(var(--spark-end, -30px));
     opacity: 0;
   }
 }

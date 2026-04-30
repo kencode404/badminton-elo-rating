@@ -197,8 +197,7 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
   const showFx = streak >= 2;
   const ringColor = intense ? '#f97316' : '#fbbf24';
   const sparkColor = ringColor;
-  const boltCount = intense ? 8 : 5;
-  const dur = intense ? 0.9 : 1.3;
+  const boltCount = intense ? 5 : 4;
 
   return (
     <div className="relative shrink-0 w-9 h-9">
@@ -216,10 +215,15 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
             }}
             aria-hidden
           />
-          {/* sparks burst from inner radius outward, fade as they go */}
+          {/* sparks burst from inner radius outward at varying distances/
+              speeds/delays so they look random rather than choreographed */}
           {Array.from({ length: boltCount }).map((_, i) => {
-            const angle = (i * 360) / boltCount + (i % 2 === 0 ? 0 : 22);
-            const delay = ((i * dur) / boltCount).toFixed(2);
+            const baseAngle = (i * 360) / boltCount;
+            const jitter = ((i * 47) % 30) - 15;            // ±15°
+            const angle = baseAngle + jitter;
+            const endDist = 26 + ((i * 13) % 14);            // 26–39 px out
+            const dur = 0.85 + ((i * 11) % 7) * 0.06;        // ~0.85–1.21s
+            const delay = ((i * 31) % 100) / 100;            // 0–1.0s
             return (
               <span
                 key={i}
@@ -227,8 +231,9 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
                 style={
                   {
                     '--spark-rotate': `${angle}deg`,
-                    animation: `spark-burst ${dur}s ease-out infinite`,
-                    animationDelay: `${delay}s`,
+                    '--spark-end': `-${endDist}px`,
+                    animation: `spark-burst ${dur.toFixed(2)}s ease-out infinite`,
+                    animationDelay: `${delay.toFixed(2)}s`,
                   } as React.CSSProperties
                 }
                 aria-hidden
