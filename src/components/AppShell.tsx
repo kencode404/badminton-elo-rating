@@ -21,6 +21,11 @@ const sideNavRight: NavItem[] = [
 ];
 
 export function AppShell() {
+  // Call useChatUnread once at the shell level — calling it inside each
+  // FlatTab would create multiple Realtime channels with the same name
+  // and Supabase rejects the duplicate subscriptions.
+  const chatUnread = useChatUnread();
+
   return (
     <div className="min-h-dvh flex flex-col cosmic-bg starfield">
       <header
@@ -62,20 +67,19 @@ export function AppShell() {
         aria-label="Bottom navigation"
       >
         {sideNav.map((item) => (
-          <FlatTab key={item.to} item={item} />
+          <FlatTab key={item.to} item={item} unreadCount={item.to === '/' ? chatUnread : 0} />
         ))}
         <CenterMatchTab />
         {sideNavRight.map((item) => (
-          <FlatTab key={item.to} item={item} />
+          <FlatTab key={item.to} item={item} unreadCount={item.to === '/' ? chatUnread : 0} />
         ))}
       </nav>
     </div>
   );
 }
 
-function FlatTab({ item }: { item: NavItem }) {
-  const unread = useChatUnread();
-  const showHomeBadge = item.to === '/' && unread > 0;
+function FlatTab({ item, unreadCount }: { item: NavItem; unreadCount: number }) {
+  const showHomeBadge = unreadCount > 0;
   return (
     <NavLink
       to={item.to}
@@ -109,7 +113,7 @@ function FlatTab({ item }: { item: NavItem }) {
                 className="absolute -top-1 -right-2 min-w-[14px] h-[14px] px-1 rounded-full bg-cyan2-400 text-zinc-900 text-[9px] flex items-center justify-center font-bold"
                 style={{ boxShadow: '0 0 6px rgba(34, 211, 238, 0.7)' }}
               >
-                {unread > 9 ? '9+' : unread}
+                {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </span>
