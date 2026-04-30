@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { formatError } from '../lib/errors';
@@ -216,87 +216,33 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
   );
 }
 
-// Realistic single-source fire behind the avatar. One tall ellipse with
-// a white-hot core fading through yellow → orange → red → transparent.
-// feTurbulence + feDisplacementMap warps the silhouette into living
-// flame edges; animating the turbulence seed makes it flicker, and a
-// CSS breathe animation makes the whole flame swell and rise like real
-// combustion.
+// Single-source fire behind the avatar, using the user-supplied
+// fire.png. The image is anchored to the bottom of the avatar so the
+// flame body sits behind it and the tongues lick upward. A CSS breathe
+// animation pulses the size + rises slightly to fake combustion movement.
 function FlameHalo({ intense }: { intense: boolean }) {
-  const id = useId().replace(/:/g, '');
-  const filterId = `flame-f-${id}`;
-  const gradId = `flame-g-${id}`;
-
-  // Taller-than-wide box so the flame is vertical. Box extends both
-  // sideways and especially upward beyond the avatar.
-  const haloW = 72;
-  const haloH = 96;
-  const offsetX = (haloW - 36) / 2;
-  const offsetY = (haloH - 36) / 2 + 6; // shift up a bit so flame rises above center
+  // Intense streaks get a bigger flame.
+  const sizePx = intense ? 72 : 60;
+  // Center horizontally on the avatar; anchor near the avatar's bottom.
+  const offsetX = (sizePx - 36) / 2;
+  const offsetY = sizePx - 32; // flame rises above the avatar
 
   return (
-    <svg
-      width={haloW}
-      height={haloH}
-      viewBox="0 0 100 140"
-      className="absolute z-0 pointer-events-none"
+    <img
+      src="/fire.png"
+      alt=""
+      width={sizePx}
+      height={sizePx}
+      className="absolute z-0 pointer-events-none select-none"
       style={{
         left: -offsetX,
         top: -offsetY,
         animation: intense
-          ? 'flame-breathe 1.6s ease-in-out infinite'
-          : 'flame-breathe 2.4s ease-in-out infinite',
-        transformOrigin: '50% 90%',
+          ? 'flame-breathe 1.4s ease-in-out infinite'
+          : 'flame-breathe 2.2s ease-in-out infinite',
+        transformOrigin: '50% 100%',
       }}
       aria-hidden
-    >
-      <defs>
-        {/* feTurbulence in vertical-stretched mode warps the ellipse
-            edge into licking flame tongues. Seed animates for flicker. */}
-        <filter id={filterId} x="-30%" y="-20%" width="160%" height="140%">
-          <feTurbulence
-            type="fractalNoise"
-            baseFrequency="0.025 0.06"
-            numOctaves="3"
-            seed="1"
-            result="noise"
-          >
-            <animate
-              attributeName="seed"
-              from="0"
-              to="80"
-              dur={intense ? '1.4s' : '2.6s'}
-              repeatCount="indefinite"
-            />
-          </feTurbulence>
-          <feDisplacementMap
-            in="SourceGraphic"
-            in2="noise"
-            scale={intense ? 22 : 16}
-          />
-        </filter>
-        {/* Gradient: white-hot core → yellow → orange → red → fade.
-            cy biased toward the bottom so the brightest part is at
-            the avatar's level and the flame fades upward. */}
-        <radialGradient id={gradId} cx="0.5" cy="0.62" r="0.55">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.9" />
-          <stop offset="15%" stopColor="#fef08a" stopOpacity="0.95" />
-          <stop offset="35%" stopColor="#fb923c" stopOpacity="0.9" />
-          <stop offset="65%" stopColor="#dc2626" stopOpacity="0.6" />
-          <stop offset="100%" stopColor="#7c2d12" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      {/* Tall ellipse — taller than wide for a real flame shape. cy
-          near the bottom so the flame body sits behind the avatar and
-          tongues lick upward. */}
-      <ellipse
-        cx="50"
-        cy="86"
-        rx="34"
-        ry="50"
-        fill={`url(#${gradId})`}
-        filter={`url(#${filterId})`}
-      />
-    </svg>
+    />
   );
 }
