@@ -11,7 +11,7 @@ export function LeaderboardPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('doubles');
   const [rows, setRows] = useState<Profile[] | null>(null);
-  const [streaks, setStreaks] = useState<Map<string, number>>(new Map());
+  const [streaks, setStreaks] = useState<Map<string, { singles: number; doubles: number }>>(new Map());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,7 +37,7 @@ export function LeaderboardPage() {
     };
   }, [tab]);
 
-  // Streaks are mode-agnostic (per-player across both modes), so fetch once.
+  // Streaks are computed per mode by the RPC; fetch once.
   useEffect(() => {
     let active = true;
     supabase
@@ -48,9 +48,16 @@ export function LeaderboardPage() {
           // Non-fatal — leaderboard still works without streak badges.
           return;
         }
-        const map = new Map<string, number>();
-        for (const row of (data ?? []) as { user_id: string; streak: number }[]) {
-          map.set(row.user_id, row.streak);
+        const map = new Map<string, { singles: number; doubles: number }>();
+        for (const row of (data ?? []) as {
+          user_id: string;
+          singles_streak: number;
+          doubles_streak: number;
+        }[]) {
+          map.set(row.user_id, {
+            singles: row.singles_streak ?? 0,
+            doubles: row.doubles_streak ?? 0,
+          });
         }
         setStreaks(map);
       });
@@ -96,16 +103,20 @@ export function LeaderboardPage() {
         </section>
       ) : (
         <ol className="space-y-2">
-          {rows.map((p, i) => (
-            <Row
-              key={p.id}
-              rank={i + 1}
-              profile={p}
-              tab={tab}
-              isMe={user?.id === p.id}
-              streak={streaks.get(p.id) ?? 0}
-            />
-          ))}
+          {rows.map((p, i) => {
+            const s = streaks.get(p.id);
+            const streak = s ? (tab === 'singles' ? s.singles : s.doubles) : 0;
+            return (
+              <Row
+                key={p.id}
+                rank={i + 1}
+                profile={p}
+                tab={tab}
+                isMe={user?.id === p.id}
+                streak={streak}
+              />
+            );
+          })}
         </ol>
       )}
     </div>
