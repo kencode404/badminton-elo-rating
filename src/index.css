@@ -2,14 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-@keyframes flame-breathe {
+@keyframes ring-grow {
   0%, 100% {
-    transform: scale(0.92);
+    transform: scale(1);
     opacity: 0.9;
   }
   50% {
-    transform: scale(1.12);
-    opacity: 1;
+    transform: scale(1.22);
+    opacity: 0.55;
   }
 }
 

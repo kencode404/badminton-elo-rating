@@ -193,12 +193,25 @@ function Row({
 }
 
 function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
-  const showHalo = streak >= 2;
   const intense = streak >= 3;
+  const showRing = streak >= 2;
+  const ringColor = intense ? '#f97316' : '#fbbf24';
 
   return (
     <div className="relative shrink-0 w-9 h-9">
-      {showHalo && <FlameHalo intense={intense} />}
+      {showRing && (
+        <span
+          className="absolute inset-0 rounded-full pointer-events-none"
+          style={{
+            border: `2px solid ${ringColor}`,
+            boxShadow: `0 0 8px ${ringColor}`,
+            animation: intense
+              ? 'ring-grow 1.2s ease-in-out infinite'
+              : 'ring-grow 2s ease-in-out infinite',
+          }}
+          aria-hidden
+        />
+      )}
       <div className="relative z-10 w-9 h-9">
         {profile.avatar_url ? (
           <img
@@ -216,33 +229,3 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
   );
 }
 
-// Single-source fire behind the avatar, using the user-supplied
-// fire.png. The image is anchored to the bottom of the avatar so the
-// flame body sits behind it and the tongues lick upward. A CSS breathe
-// animation pulses the size + rises slightly to fake combustion movement.
-function FlameHalo({ intense }: { intense: boolean }) {
-  // Centered behind the avatar and big enough that the flame shows on
-  // all sides — avatar (36px) sits in the middle, flame extends well
-  // beyond it.
-  const sizePx = intense ? 96 : 78;
-  const offset = (sizePx - 36) / 2;
-
-  return (
-    <img
-      src="/fire.png"
-      alt=""
-      width={sizePx}
-      height={sizePx}
-      className="absolute z-0 pointer-events-none select-none"
-      style={{
-        left: -offset,
-        top: -offset,
-        animation: intense
-          ? 'flame-breathe 1.4s ease-in-out infinite'
-          : 'flame-breathe 2.2s ease-in-out infinite',
-        transformOrigin: '50% 50%',
-      }}
-      aria-hidden
-    />
-  );
-}
