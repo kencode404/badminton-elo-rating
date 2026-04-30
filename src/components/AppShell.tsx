@@ -45,7 +45,10 @@ export function AppShell() {
         </div>
       </header>
 
-      <main className="flex-1 pb-28 relative z-0">
+      <main
+        className="flex-1 relative z-0"
+        style={{ paddingBottom: 'calc(7.5rem + env(safe-area-inset-bottom))' }}
+      >
         <Outlet />
       </main>
 
