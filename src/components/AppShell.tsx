@@ -1,12 +1,19 @@
+import type { ReactNode } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
 import { NotificationBell } from './NotificationBell';
 
-const navItems = [
-  { to: '/', label: 'Home', glyph: '◆' },
-  { to: '/leaderboard', label: 'Ranks', glyph: '✦' },
-  { to: '/record', label: 'Record', glyph: '◈' },
-  { to: '/profile', label: 'Profile', glyph: '✧' },
+interface NavItem {
+  to: string;
+  label: string;
+  icon: ReactNode;
+}
+
+const navItems: NavItem[] = [
+  { to: '/', label: 'Home', icon: <span className="text-lg leading-none">◆</span> },
+  { to: '/leaderboard', label: 'Ranks', icon: <span className="text-lg leading-none">✦</span> },
+  { to: '/record', label: 'Record', icon: <span className="text-lg leading-none">◈</span> },
+  { to: '/profile', label: 'Profile', icon: <UserIcon /> },
 ];
 
 export function AppShell() {
@@ -60,10 +67,12 @@ export function AppShell() {
                   />
                 )}
                 <span
-                  className={`text-lg mb-0.5 ${isActive ? 'text-cyan2-400' : ''}`}
+                  className={`mb-0.5 flex items-center justify-center h-5 ${
+                    isActive ? 'text-cyan2-400' : ''
+                  }`}
                   aria-hidden
                 >
-                  {item.glyph}
+                  {item.icon}
                 </span>
                 <span className="uppercase text-[10px]">{item.label}</span>
               </>
@@ -72,5 +81,24 @@ export function AppShell() {
         ))}
       </nav>
     </div>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M4.5 20.5v-1a5.5 5.5 0 0 1 5.5-5.5h4a5.5 5.5 0 0 1 5.5 5.5v1" />
+    </svg>
   );
 }
