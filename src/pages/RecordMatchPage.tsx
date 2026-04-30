@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { getMyMatches, type MatchSummary } from '../lib/matches';
+import { getMyMatches, respondToMatch, type MatchSummary } from '../lib/matches';
+import { formatError } from '../lib/errors';
 import type { MatchStatus } from '../lib/database.types';
 
 export function RecordMatchPage() {
   const { user } = useAuth();
   const [matches, setMatches] = useState<MatchSummary[] | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -15,7 +17,7 @@ export function RecordMatchPage() {
       const data = await getMyMatches(user.id);
       setMatches(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load matches');
+      setError(formatError(err));
     }
   }, [user]);
 
@@ -23,10 +25,32 @@ export function RecordMatchPage() {
     load();
   }, [load]);
 
-  return (
-    <div className="p-4 space-y-4">
-      <div className="section-title text-base">Match History</div>
+  async function respond(matchId: string, decision: 'accepted' | 'rejected') {
+    if (!user) return;
+    setBusyId(matchId);
+    setError(null);
+    try {
+      await respondToMatch(matchId, user.id, decision);
+      await load();
+    } catch (err) {
+      setError(formatError(err));
+    } finally {
+      setBusyId(null);
+    }
+  }
 
+  const invitations =
+    matches?.filter(
+      (m) => m.match.status === 'pending' && m.myConfirmation === 'pending',
+    ) ?? [];
+  const pending =
+    matches?.filter(
+      (m) => m.match.status === 'pending' && m.myConfirmation === 'accepted',
+    ) ?? [];
+  const history = matches?.filter((m) => m.match.status !== 'pending') ?? [];
+
+  return (
+    <div className="p-4 space-y-5">
       {error && (
         <div className="text-xs text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/40 rounded-md px-3 py-2">
           {error}
@@ -35,19 +59,45 @@ export function RecordMatchPage() {
 
       {matches === null ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-500">Loading…</p>
-      ) : matches.length === 0 ? (
-        <section className="glass-panel p-6 text-center">
-          <div className="text-3xl mb-2 text-cyan2-400" aria-hidden>◈</div>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            No matches yet. Tap the + button to record your first one.
-          </p>
-        </section>
       ) : (
-        <div className="space-y-2">
-          {matches.map((m) => (
-            <MatchRow key={m.match.id} summary={m} />
-          ))}
-        </div>
+        <>
+          {invitations.length > 0 && (
+            <section className="space-y-2">
+              <div className="section-title">Awaiting Your Response</div>
+              {invitations.map((m) => (
+                <InvitationCard
+                  key={m.match.id}
+                  summary={m}
+                  busy={busyId === m.match.id}
+                  onRespond={respond}
+                />
+              ))}
+            </section>
+          )}
+
+          {pending.length > 0 && (
+            <section className="space-y-2">
+              <div className="section-title">Pending Matches</div>
+              {pending.map((m) => (
+                <MatchRow key={m.match.id} summary={m} />
+              ))}
+            </section>
+          )}
+
+          <section className="space-y-2">
+            <div className="section-title">Match History</div>
+            {history.length === 0 ? (
+              <div className="glass-panel p-6 text-center">
+                <div className="text-3xl mb-2 text-cyan2-400" aria-hidden>◈</div>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  No settled matches yet. Tap the SMASH button to record one.
+                </p>
+              </div>
+            ) : (
+              history.map((m) => <MatchRow key={m.match.id} summary={m} />)
+            )}
+          </section>
+        </>
       )}
 
       <Link
@@ -63,6 +113,74 @@ export function RecordMatchPage() {
         +
       </Link>
     </div>
+  );
+}
+
+function InvitationCard({
+  summary,
+  busy,
+  onRespond,
+}: {
+  summary: MatchSummary;
+  busy: boolean;
+  onRespond: (matchId: string, decision: 'accepted' | 'rejected') => void;
+}) {
+  const { match, myTeam, participants } = summary;
+  const teamA = participants.filter((p) => p.team === 'A');
+  const teamB = participants.filter((p) => p.team === 'B');
+  const myScore = myTeam === 'A' ? match.score_a : match.score_b;
+  const oppScore = myTeam === 'A' ? match.score_b : match.score_a;
+  const claimedWin = myScore > oppScore;
+
+  return (
+    <article
+      className="glass-panel p-4 space-y-3 ring-1 ring-cyan2-400/40"
+      style={{ boxShadow: '0 0 0 1px rgba(34,211,238,0.1), 0 6px 18px -6px rgba(34,211,238,0.25)' }}
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-display uppercase tracking-widest text-cyan2-500 dark:text-cyan2-300">
+          {match.match_type}
+        </span>
+        <span
+          className={`text-[10px] font-display uppercase tracking-widest ${
+            claimedWin ? 'text-emerald-500' : 'text-red-400'
+          }`}
+        >
+          {claimedWin ? 'win' : 'loss'} (your team)
+        </span>
+      </div>
+
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+        <TeamCol players={teamA} mine={myTeam === 'A'} />
+        <div className="text-center">
+          <div className="font-display text-2xl text-zinc-900 dark:text-zinc-100 leading-none whitespace-nowrap">
+            {match.score_a}
+            <span className="text-zinc-400 dark:text-zinc-600 mx-1">:</span>
+            {match.score_b}
+          </div>
+        </div>
+        <TeamCol players={teamB} mine={myTeam === 'B'} alignRight />
+      </div>
+
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          onClick={() => onRespond(match.id, 'rejected')}
+          disabled={busy}
+          className="cosmic-button-ghost flex-1 text-xs"
+        >
+          Reject
+        </button>
+        <button
+          type="button"
+          onClick={() => onRespond(match.id, 'accepted')}
+          disabled={busy}
+          className="cosmic-button flex-1 text-xs"
+        >
+          {busy ? 'Saving…' : 'Accept'}
+        </button>
+      </div>
+    </article>
   );
 }
 

@@ -172,17 +172,20 @@ function Shuttlecock({ size = 20 }: { size?: number }) {
       width={size}
       height={size}
       viewBox="0 0 64 64"
-      fill="currentColor"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden
     >
-      <ellipse cx="14" cy="50" rx="9" ry="7" transform="rotate(-25 14 50)" />
-      <g transform="translate(22 42)">
-        <path d="M0 0 Q4 -16 0 -34 Q-4 -16 0 0 Z" transform="rotate(0)" />
-        <path d="M0 0 Q4 -16 0 -34 Q-4 -16 0 0 Z" transform="rotate(20)" />
-        <path d="M0 0 Q4 -16 0 -34 Q-4 -16 0 0 Z" transform="rotate(40)" />
-        <path d="M0 0 Q4 -16 0 -34 Q-4 -16 0 0 Z" transform="rotate(60)" />
-        <path d="M0 0 Q4 -16 0 -34 Q-4 -16 0 0 Z" transform="rotate(80)" />
-      </g>
+      <path d="M16 5 L23 5 L27 35 L18 32 Z" />
+      <path d="M38 8 L45 14 L30 40 L23 34 Z" />
+      <path d="M56 24 L59 33 L30 42 L26 36 Z" />
+      <path d="M12 60 Q4 60 4 50 Q4 42 14 42 Q23 42 24 50 L21 60 Z" />
+      <line x1="8" y1="46" x2="10" y2="60" />
+      <line x1="13" y1="43" x2="15" y2="60" />
+      <line x1="18" y1="44" x2="19" y2="60" />
     </svg>
   );
 }
