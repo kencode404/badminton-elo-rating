@@ -193,11 +193,14 @@ function Row({
 }
 
 function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
-  const intense = streak >= 3;
   const showRing = streak >= 2;
   const showSparks = streak >= 4;
-  const ringColor = intense ? '#f97316' : '#fbbf24';
+  const ringColor = streak >= 3 ? '#f97316' : '#fbbf24'; // amber → orange
   const sparkColor = ringColor;
+  // Pulse speed steps down by streak: 2-win calm, 3-win mild bump,
+  // 4+-win full intensity.
+  const ringDur =
+    streak >= 4 ? '1.2s' : streak >= 3 ? '1.7s' : '2s';
   const boltCount = streak >= 5 ? 12 : 8;
 
   return (
@@ -208,9 +211,7 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
           style={{
             border: `2px solid ${ringColor}`,
             boxShadow: `0 0 8px ${ringColor}`,
-            animation: intense
-              ? 'ring-grow 1.2s ease-in-out infinite'
-              : 'ring-grow 2s ease-in-out infinite',
+            animation: `ring-grow ${ringDur} ease-in-out infinite`,
           }}
           aria-hidden
         />
