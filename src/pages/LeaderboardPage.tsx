@@ -9,7 +9,7 @@ type Profile = Database['public']['Tables']['profiles']['Row'];
 
 export function LeaderboardPage() {
   const { user } = useAuth();
-  const [tab, setTab] = useState<Tab>('singles');
+  const [tab, setTab] = useState<Tab>('doubles');
   const [rows, setRows] = useState<Profile[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,7 +41,7 @@ export function LeaderboardPage() {
       <div className="section-title text-base mb-1">Leaderboard</div>
 
       <div className="flex glass-panel p-1">
-        {(['singles', 'doubles'] as const).map((t) => (
+        {(['doubles', 'singles'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}

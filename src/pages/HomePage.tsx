@@ -74,10 +74,10 @@ export function HomePage() {
       <section className="grid grid-cols-2 gap-3">
         <div className="glass-panel p-4 panel-stripe pl-6">
           <div className="text-[10px] font-display uppercase tracking-wider text-cyan2-500 dark:text-cyan2-300">
-            Singles
+            Doubles
           </div>
           <div className="font-display text-3xl mt-1 text-zinc-900 dark:text-zinc-100">
-            {profile?.singles_rating ?? '—'}
+            {profile?.doubles_rating ?? '—'}
           </div>
           <div className="text-[10px] text-zinc-500 dark:text-zinc-500 mt-1 tracking-wider uppercase">
             Rating
@@ -85,10 +85,10 @@ export function HomePage() {
         </div>
         <div className="glass-panel p-4 panel-stripe pl-6">
           <div className="text-[10px] font-display uppercase tracking-wider text-cyan2-500 dark:text-cyan2-300">
-            Doubles
+            Singles
           </div>
           <div className="font-display text-3xl mt-1 text-zinc-900 dark:text-zinc-100">
-            {profile?.doubles_rating ?? '—'}
+            {profile?.singles_rating ?? '—'}
           </div>
           <div className="text-[10px] text-zinc-500 dark:text-zinc-500 mt-1 tracking-wider uppercase">
             Rating

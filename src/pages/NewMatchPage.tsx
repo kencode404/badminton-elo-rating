@@ -11,7 +11,7 @@ export function NewMatchPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [matchType, setMatchType] = useState<MatchType>('singles');
+  const [matchType, setMatchType] = useState<MatchType>('doubles');
   const [partner, setPartner] = useState<ProfileLite[]>([]);
   const [opponents, setOpponents] = useState<ProfileLite[]>([]);
   const [scoreA, setScoreA] = useState('');
@@ -89,7 +89,7 @@ export function NewMatchPage() {
       </div>
 
       <div className="flex glass-panel p-1">
-        {(['singles', 'doubles'] as const).map((t) => (
+        {(['doubles', 'singles'] as const).map((t) => (
           <button
             key={t}
             type="button"

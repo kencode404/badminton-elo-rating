@@ -210,8 +210,8 @@ export function ProfilePage() {
           <p className="text-sm text-zinc-500 dark:text-zinc-500">Loading…</p>
         ) : profile ? (
           <div className="grid grid-cols-2 gap-3">
-            <Stat label="Singles" rating={profile.singles_rating} games={profile.singles_games_played} />
             <Stat label="Doubles" rating={profile.doubles_rating} games={profile.doubles_games_played} />
+            <Stat label="Singles" rating={profile.singles_rating} games={profile.singles_games_played} />
           </div>
         ) : (
           <p className="text-sm text-zinc-500 dark:text-zinc-500">
