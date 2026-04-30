@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { formatError } from '../lib/errors';
@@ -193,46 +193,21 @@ function Row({
 }
 
 function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
-  // Flame halo: 4 small flames at 2 wins, 8 animated flames + brighter
-  // glow at 3+ wins.
-  const flameCount = streak >= 3 ? 8 : streak >= 2 ? 4 : 0;
-  const animated = streak >= 3;
-  const ringClass =
-    streak >= 3
-      ? 'ring-2 ring-orange-500'
-      : streak >= 2
-        ? 'ring-2 ring-amber-400'
-        : '';
-  const ringStyle =
-    streak >= 3
-      ? { boxShadow: '0 0 12px rgba(249, 115, 22, 0.65)' }
-      : streak >= 2
-        ? { boxShadow: '0 0 8px rgba(251, 191, 36, 0.5)' }
-        : undefined;
+  const showHalo = streak >= 2;
+  const intense = streak >= 3;
 
   return (
     <div className="relative shrink-0 w-9 h-9">
-      {flameCount > 0 && (
-        <FlameRing
-          count={flameCount}
-          animated={animated}
-          radius={streak >= 3 ? 22 : 20}
-          size={streak >= 3 ? 13 : 11}
-        />
-      )}
+      {showHalo && <FlameHalo intense={intense} />}
       <div className="relative z-10 w-9 h-9">
         {profile.avatar_url ? (
           <img
             src={profile.avatar_url}
             alt=""
-            className={`w-9 h-9 rounded-full object-cover border border-zinc-200 dark:border-zinc-700 ${ringClass}`}
-            style={ringStyle}
+            className="w-9 h-9 rounded-full object-cover border border-zinc-200 dark:border-zinc-700"
           />
         ) : (
-          <div
-            className={`w-9 h-9 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center font-semibold ${ringClass}`}
-            style={ringStyle}
-          >
+          <div className="w-9 h-9 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center font-semibold">
             {profile.display_name?.[0]?.toUpperCase() ?? '?'}
           </div>
         )}
@@ -241,41 +216,71 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
   );
 }
 
-function FlameRing({
-  count,
-  animated,
-  radius,
-  size,
-}: {
-  count: number;
-  animated: boolean;
-  radius: number;
-  size: number;
-}) {
+// Single fire halo wrapping the avatar. A radial yellow→orange→red
+// gradient is drawn on a circle, then SVG turbulence + displacement
+// makes the edge waver like real flames. Animating the turbulence
+// seed makes the flames flicker; rotating the whole halo gives a
+// 'hot-wheels' spin.
+function FlameHalo({ intense }: { intense: boolean }) {
+  const id = useId().replace(/:/g, '');
+  const filterId = `flame-f-${id}`;
+  const gradId = `flame-g-${id}`;
+  // Halo extends ~10px outside the 36px avatar.
+  const haloPx = 56;
+  const offset = (haloPx - 36) / 2;
+
   return (
-    <div
-      className="absolute inset-0 z-0 pointer-events-none"
+    <svg
+      width={haloPx}
+      height={haloPx}
+      viewBox="0 0 100 100"
+      className="absolute z-0 pointer-events-none"
+      style={{
+        left: -offset,
+        top: -offset,
+        animation: intense
+          ? 'flame-spin 8s linear infinite'
+          : 'flame-spin 14s linear infinite',
+      }}
       aria-hidden
     >
-      {Array.from({ length: count }).map((_, i) => {
-        const angle = (i * 360) / count;
-        return (
-          <span
-            key={i}
-            className={`absolute top-1/2 left-1/2 leading-none select-none ${
-              animated ? 'animate-pulse' : ''
-            }`}
-            style={{
-              fontSize: `${size}px`,
-              transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-${radius}px)`,
-              animationDelay: animated ? `${(i * 0.12).toFixed(2)}s` : undefined,
-              filter: 'drop-shadow(0 0 3px rgba(249, 115, 22, 0.7))',
-            }}
+      <defs>
+        <filter id={filterId} x="-30%" y="-30%" width="160%" height="160%">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency={intense ? '0.06 0.11' : '0.05 0.09'}
+            numOctaves="2"
+            seed="3"
+            result="noise"
           >
-            🔥
-          </span>
-        );
-      })}
-    </div>
+            <animate
+              attributeName="seed"
+              from="0"
+              to="100"
+              dur={intense ? '3s' : '5s'}
+              repeatCount="indefinite"
+            />
+          </feTurbulence>
+          <feDisplacementMap
+            in="SourceGraphic"
+            in2="noise"
+            scale={intense ? 14 : 8}
+          />
+        </filter>
+        <radialGradient id={gradId} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0%" stopColor="#fcd34d" stopOpacity={intense ? 1 : 0.9} />
+          <stop offset="40%" stopColor="#f97316" stopOpacity={intense ? 0.95 : 0.7} />
+          <stop offset="75%" stopColor="#dc2626" stopOpacity={intense ? 0.55 : 0.3} />
+          <stop offset="100%" stopColor="#7c2d12" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <circle
+        cx="50"
+        cy="50"
+        r="44"
+        fill={`url(#${gradId})`}
+        filter={`url(#${filterId})`}
+      />
+    </svg>
   );
 }
