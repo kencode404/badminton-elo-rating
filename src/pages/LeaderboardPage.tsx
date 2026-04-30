@@ -216,18 +216,48 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
   );
 }
 
-// Single fire halo wrapping the avatar. A radial yellow→orange→red
-// gradient is drawn on a circle, then SVG turbulence + displacement
-// makes the edge waver like real flames. Animating the turbulence
-// seed makes the flames flicker; rotating the whole halo gives a
-// 'hot-wheels' spin.
+// Fire halo wrapping the avatar in stylised flame tongues.
+// A linear gradient (yellow tip → orange middle → red base) is applied
+// to each individual tongue, then a subtle feTurbulence flicker makes
+// the edges shimmer. The whole halo slowly spins, hot-wheels style.
 function FlameHalo({ intense }: { intense: boolean }) {
   const id = useId().replace(/:/g, '');
   const filterId = `flame-f-${id}`;
   const gradId = `flame-g-${id}`;
-  // Halo extends ~10px outside the 36px avatar.
-  const haloPx = 56;
+  // Halo extends ~14px outside the 36px avatar to give the tongue tips room.
+  const haloPx = 64;
   const offset = (haloPx - 36) / 2;
+
+  // Each entry: angle around the avatar, and a relative tongue length
+  // (1 = base, 1.3 = longer tongue). Alternating long/short keeps it
+  // organic-looking. Intense streaks add a second offset ring with
+  // shorter tongues filling the gaps.
+  const baseTongues: { angle: number; len: number }[] = [
+    { angle: 0, len: 1.25 },
+    { angle: 45, len: 1.0 },
+    { angle: 90, len: 1.25 },
+    { angle: 135, len: 1.0 },
+    { angle: 180, len: 1.25 },
+    { angle: 225, len: 1.0 },
+    { angle: 270, len: 1.25 },
+    { angle: 315, len: 1.0 },
+  ];
+  const innerTongues: { angle: number; len: number }[] = [
+    { angle: 22.5, len: 0.8 },
+    { angle: 67.5, len: 0.8 },
+    { angle: 112.5, len: 0.8 },
+    { angle: 157.5, len: 0.8 },
+    { angle: 202.5, len: 0.8 },
+    { angle: 247.5, len: 0.8 },
+    { angle: 292.5, len: 0.8 },
+    { angle: 337.5, len: 0.8 },
+  ];
+  const tongues = intense ? [...baseTongues, ...innerTongues] : baseTongues;
+
+  // Tongue path in local coords: base at (0,0), tip at (0,-18), wider at
+  // base and curving in toward a sharp tip.
+  const tonguePath =
+    'M -3 0 Q -4 -8 -1 -16 Q 0 -19 1 -16 Q 4 -8 3 0 Z';
 
   return (
     <svg
@@ -239,48 +269,49 @@ function FlameHalo({ intense }: { intense: boolean }) {
         left: -offset,
         top: -offset,
         animation: intense
-          ? 'flame-spin 8s linear infinite'
-          : 'flame-spin 14s linear infinite',
+          ? 'flame-spin 6s linear infinite'
+          : 'flame-spin 12s linear infinite',
       }}
       aria-hidden
     >
       <defs>
-        <filter id={filterId} x="-30%" y="-30%" width="160%" height="160%">
+        {/* Flame gradient: tip = yellow, middle = orange, base = red. */}
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#fde047" />
+          <stop offset="35%" stopColor="#f97316" />
+          <stop offset="100%" stopColor="#dc2626" />
+        </linearGradient>
+        {/* Subtle flicker — much smaller scale than before so the
+            tongue silhouette stays readable. */}
+        <filter id={filterId} x="-15%" y="-15%" width="130%" height="130%">
           <feTurbulence
             type="fractalNoise"
-            baseFrequency={intense ? '0.06 0.11' : '0.05 0.09'}
+            baseFrequency="0.12"
             numOctaves="2"
-            seed="3"
+            seed="2"
             result="noise"
           >
             <animate
               attributeName="seed"
               from="0"
-              to="100"
-              dur={intense ? '3s' : '5s'}
+              to="60"
+              dur={intense ? '2.4s' : '4s'}
               repeatCount="indefinite"
             />
           </feTurbulence>
-          <feDisplacementMap
-            in="SourceGraphic"
-            in2="noise"
-            scale={intense ? 14 : 8}
-          />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale={intense ? 4 : 2.5} />
         </filter>
-        <radialGradient id={gradId} cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0%" stopColor="#fcd34d" stopOpacity={intense ? 1 : 0.9} />
-          <stop offset="40%" stopColor="#f97316" stopOpacity={intense ? 0.95 : 0.7} />
-          <stop offset="75%" stopColor="#dc2626" stopOpacity={intense ? 0.55 : 0.3} />
-          <stop offset="100%" stopColor="#7c2d12" stopOpacity="0" />
-        </radialGradient>
       </defs>
-      <circle
-        cx="50"
-        cy="50"
-        r="44"
-        fill={`url(#${gradId})`}
-        filter={`url(#${filterId})`}
-      />
+      <g filter={`url(#${filterId})`}>
+        {tongues.map((t, i) => (
+          <path
+            key={i}
+            d={tonguePath}
+            fill={`url(#${gradId})`}
+            transform={`translate(50 50) rotate(${t.angle}) translate(0 -22) scale(1 ${t.len})`}
+          />
+        ))}
+      </g>
     </svg>
   );
 }
