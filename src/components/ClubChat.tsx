@@ -138,10 +138,25 @@ export function ClubChat() {
         { event: '*', schema: 'public', table: 'chat_reactions' },
         () => loadReactions(),
       )
-      .subscribe();
+      .subscribe((status) => {
+        // Surface subscription status so we can spot a misconfigured
+        // realtime publication in the console without crashing.
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[ClubChat] realtime status:', status);
+        }
+      });
+
+    // Polling fallback — realtime should drive updates instantly, but
+    // poll every 8s as a safety net if events are dropped or the
+    // table isn't in the supabase_realtime publication.
+    const poll = window.setInterval(() => {
+      loadMessages();
+      loadReactions();
+    }, 8000);
 
     return () => {
       active = false;
+      window.clearInterval(poll);
       supabase.removeChannel(channel);
     };
   }, [user]);
