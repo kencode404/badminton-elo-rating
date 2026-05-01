@@ -21,6 +21,41 @@ export default defineConfig({
         'diamond-tier.png',
         'predator-tier.png',
       ],
+      workbox: {
+        // Runtime caching for Supabase reads + avatar images so users
+        // see their last-known data on weak / no signal. Mutations
+        // (POST/PATCH/DELETE) and Realtime subscriptions still need
+        // the network; only GETs to the REST endpoint are cached.
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
+            handler: 'StaleWhileRevalidate',
+            method: 'GET',
+            options: {
+              cacheName: 'supabase-rest',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 7, // 1 week
+              },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            urlPattern:
+              /^https:\/\/.*\.supabase\.co\/storage\/v1\/object\/public\/avatars\/.*/i,
+            handler: 'CacheFirst',
+            method: 'GET',
+            options: {
+              cacheName: 'supabase-avatars',
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
+      },
       manifest: {
         name: 'Badminton ELO',
         short_name: 'Badminton ELO',
