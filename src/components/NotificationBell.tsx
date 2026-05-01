@@ -27,11 +27,16 @@ export function NotificationBell() {
     let active = true;
 
     async function refresh() {
+      // Inner-join matches so we only count pending participants on
+      // matches that are still themselves pending. Otherwise rows
+      // orphaned by a rejection / expiry inflate the badge while the
+      // popover (which joins to matches.status='pending') stays empty.
       const { count } = await supabase
         .from('match_participants')
-        .select('*', { count: 'exact', head: true })
+        .select('*, matches!inner(status)', { count: 'exact', head: true })
         .eq('user_id', user!.id)
-        .eq('confirmation', 'pending');
+        .eq('confirmation', 'pending')
+        .eq('matches.status', 'pending');
       if (active) setCount(count ?? 0);
     }
 
