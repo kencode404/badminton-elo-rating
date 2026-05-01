@@ -39,16 +39,16 @@ export function ScoringGuidePage() {
         </p>
         <ul className="mt-3 space-y-1.5 text-sm text-zinc-700 dark:text-zinc-300">
           <li className="flex items-start gap-2">
-            <span className="text-cyan2-500 dark:text-cyan2-300 mt-0.5">◆</span>
-            Everyone starts at <strong>1000</strong> — fresh in Bronze.
+            <span className="text-cyan2-500 dark:text-cyan2-300 mt-0.5 shrink-0">◆</span>
+            <span>Everyone starts at <strong>1000</strong> — fresh in Bronze.</span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-cyan2-500 dark:text-cyan2-300 mt-0.5">◆</span>
-            Singles and doubles ratings are <strong>completely separate</strong>. A great singles player can be average at doubles.
+            <span className="text-cyan2-500 dark:text-cyan2-300 mt-0.5 shrink-0">◆</span>
+            <span>Singles and doubles ratings are <strong>completely separate</strong>. A great singles player can be average at doubles.</span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-cyan2-500 dark:text-cyan2-300 mt-0.5">◆</span>
-            Your rating maps to a <strong>tier</strong> on the leaderboard — Bronze through Predator. See the Tiers section below.
+            <span className="text-cyan2-500 dark:text-cyan2-300 mt-0.5 shrink-0">◆</span>
+            <span>Your rating maps to a <strong>tier</strong> on the leaderboard — Bronze through Predator. See the Tiers section below.</span>
           </li>
         </ul>
       </section>
@@ -230,17 +230,16 @@ export function ScoringGuidePage() {
         </h2>
         <ul className="space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
           <li className="flex items-start gap-2">
-            <span className="text-cyan2-500 dark:text-cyan2-300 mt-0.5">◆</span>
-            When someone records a match, all other players must accept it
-            before ratings update.
+            <span className="text-cyan2-500 dark:text-cyan2-300 mt-0.5 shrink-0">◆</span>
+            <span>When someone records a match, all other players must accept it before ratings update.</span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-cyan2-500 dark:text-cyan2-300 mt-0.5">◆</span>
-            If anyone rejects, the match is dropped and no ratings change.
+            <span className="text-cyan2-500 dark:text-cyan2-300 mt-0.5 shrink-0">◆</span>
+            <span>If anyone rejects, the match is dropped and no ratings change.</span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-cyan2-500 dark:text-cyan2-300 mt-0.5">◆</span>
-            Pending matches expire after <strong>7 days</strong> if not all confirmed.
+            <span className="text-cyan2-500 dark:text-cyan2-300 mt-0.5 shrink-0">◆</span>
+            <span>Pending matches expire after <strong>7 days</strong> if not all confirmed.</span>
           </li>
         </ul>
       </section>
