@@ -58,8 +58,21 @@ export function AppShell() {
         <Outlet />
       </main>
 
+      {/* Backdrop strip behind the floating pill nav. Fades content
+          into the page background so nothing peeks through the side
+          and bottom gaps around the pill. Sits above main (z-0) and
+          below the nav (DOM order). */}
+      <div
+        aria-hidden
+        className="fixed inset-x-0 bottom-0 pointer-events-none bg-gradient-to-t from-[#f4f4f5] from-65% to-transparent dark:from-[#0a0a0c]"
+        style={{
+          height: 'calc(7.5rem + env(safe-area-inset-bottom))',
+          zIndex: 5,
+        }}
+      />
+
       <nav
-        className="fixed inset-x-3 grid grid-cols-5 glass-panel"
+        className="fixed inset-x-3 grid grid-cols-5 glass-panel z-10"
         style={{
           bottom: 'calc(0.75rem + env(safe-area-inset-bottom))',
           overflow: 'visible',
