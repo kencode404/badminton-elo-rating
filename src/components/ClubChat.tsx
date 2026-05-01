@@ -398,7 +398,12 @@ function SystemStreakRow({
           {text}
         </div>
         {pickerOpen && (
-          <ReactionPicker anchorRef={bubbleRef} alignRight={false} onPick={onToggleReaction} />
+          <ReactionPicker
+            anchorRef={bubbleRef}
+            alignRight={false}
+            currentEmoji={findMyEmoji(reactions, currentUserId)}
+            onPick={onToggleReaction}
+          />
         )}
         <ReactionsBar
           reactions={reactions}
@@ -454,7 +459,12 @@ function UserMessageRow({
           {msg.body}
         </div>
         {pickerOpen && (
-          <ReactionPicker anchorRef={bubbleRef} alignRight={isMine} onPick={onToggleReaction} />
+          <ReactionPicker
+            anchorRef={bubbleRef}
+            alignRight={isMine}
+            currentEmoji={findMyEmoji(reactions, currentUserId)}
+            onPick={onToggleReaction}
+          />
         )}
         <ReactionsBar
           reactions={reactions}
@@ -526,13 +536,26 @@ function ReactionsBar({
 // + computed coordinates anchored to the bubble so it isn't clipped
 // by the chat panel's overflow boundary. Flips above/below depending
 // on which side has more room.
+function findMyEmoji(
+  reactions: Map<string, Reaction[]>,
+  currentUserId: string | null,
+): string | null {
+  if (!currentUserId) return null;
+  for (const [emoji, list] of reactions) {
+    if (list.some((r) => r.user_id === currentUserId)) return emoji;
+  }
+  return null;
+}
+
 function ReactionPicker({
   anchorRef,
   alignRight,
+  currentEmoji,
   onPick,
 }: {
   anchorRef: React.RefObject<HTMLElement | null>;
   alignRight: boolean;
+  currentEmoji: string | null;
   onPick: (emoji: string) => void;
 }) {
   const PICKER_HEIGHT = 48;
@@ -580,17 +603,27 @@ function ReactionPicker({
       }}
       className="flex gap-1 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-lg p-1"
     >
-      {REACTION_PALETTE.map((e) => (
-        <button
-          key={e}
-          type="button"
-          onClick={() => onPick(e)}
-          className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition text-lg"
-          aria-label={`React with ${e}`}
-        >
-          {e}
-        </button>
-      ))}
+      {REACTION_PALETTE.map((e) => {
+        const selected = e === currentEmoji;
+        return (
+          <button
+            key={e}
+            type="button"
+            onClick={() => onPick(e)}
+            className={`inline-flex items-center justify-center w-8 h-8 rounded-full transition text-lg ${
+              selected
+                ? 'bg-cyan2-500/25 ring-2 ring-cyan2-400'
+                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
+            }`}
+            aria-label={
+              selected ? `Remove ${e} reaction` : `React with ${e}`
+            }
+            title={selected ? 'Tap to remove' : ''}
+          >
+            {e}
+          </button>
+        );
+      })}
     </div>
   );
 }
