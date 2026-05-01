@@ -72,6 +72,11 @@ export function ClubChat() {
   const [pickerForMsg, setPickerForMsg] = useState<string | null>(null);
   const [reactorsForMsg, setReactorsForMsg] = useState<string | null>(null);
 
+  // Snapshot of the user's last-seen timestamp BEFORE this visit, used
+  // once on first render so we can scroll to where they left off.
+  const [initialLastSeen, setInitialLastSeen] = useState<string | null>(null);
+  const initialScrollDoneRef = useRef(false);
+
   const listRef = useRef<HTMLDivElement>(null);
 
   // Fetch messages (system + user) and reactions, then subscribe.
@@ -179,10 +184,67 @@ export function ClubChat() {
     };
   }, [user]);
 
-  // Auto-scroll to bottom when messages list changes.
+  // Snapshot the user's chat_last_seen_at BEFORE marking it. Used once
+  // on first render to scroll to where they left off.
   useEffect(() => {
-    if (!listRef.current) return;
-    listRef.current.scrollTop = listRef.current.scrollHeight;
+    if (!user) return;
+    let active = true;
+    supabase
+      .from('profiles')
+      .select('chat_last_seen_at')
+      .eq('id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active) setInitialLastSeen(data?.chat_last_seen_at ?? null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [user]);
+
+  // First-render scroll: jump to the user's first unread message (so their
+  // last-read sits at the top of the visible area). If everything is
+  // read, fall back to scrolling to the bottom (latest).
+  useEffect(() => {
+    if (initialScrollDoneRef.current) return;
+    if (!listRef.current || !messages || messages.length === 0) return;
+    if (initialLastSeen === null) return;
+
+    const firstUnreadIdx = messages.findIndex(
+      (m) => m.created_at > initialLastSeen,
+    );
+    const el = listRef.current;
+    if (firstUnreadIdx === -1) {
+      // Everything already read → bottom
+      el.scrollTop = el.scrollHeight;
+    } else {
+      const target = el.querySelector(
+        `[data-msg-id="${messages[firstUnreadIdx].id}"]`,
+      ) as HTMLElement | null;
+      if (target) {
+        // Position the first-unread message near the top with a small
+        // offset so the previous (last-read) message is still in view.
+        el.scrollTop = Math.max(0, target.offsetTop - 36);
+      } else {
+        el.scrollTop = el.scrollHeight;
+      }
+    }
+    initialScrollDoneRef.current = true;
+    // Now safe to mark seen (we've used the snapshot for scroll positioning).
+    if (user) markChatSeen(user.id);
+  }, [messages, initialLastSeen, user]);
+
+  // For subsequent message updates, only auto-scroll to bottom if the
+  // user is already near it (i.e. they're "live" reading). If they've
+  // scrolled up to view history, don't yank them back.
+  useEffect(() => {
+    if (!initialScrollDoneRef.current) return;
+    if (!listRef.current || !messages) return;
+    const el = listRef.current;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distFromBottom < 60) {
+      el.scrollTop = el.scrollHeight;
+    }
   }, [messages]);
 
   // Close any open popover (picker or reactors) on outside tap or Escape.
@@ -210,12 +272,7 @@ export function ClubChat() {
     };
   }, [pickerForMsg, reactorsForMsg]);
 
-  // Mark chat seen on mount and whenever the message list updates while
-  // the user is on this page.
-  useEffect(() => {
-    if (!user) return;
-    markChatSeen(user.id);
-  }, [user, messages]);
+  // (markChatSeen now fires once after the first-render scroll, see above.)
 
   // Group reactions by message_id and emoji for fast lookup.
   const reactionsByMessage = useMemo(() => {
@@ -422,7 +479,7 @@ function SystemStreakRow({
   const longPress = useLongPress(onTogglePicker);
 
   return (
-    <div className="flex justify-start">
+    <div className="flex justify-start" data-msg-id={msg.id}>
       <div className="max-w-[88%] flex flex-col items-start gap-1">
         <div className={`text-[9px] font-display uppercase tracking-widest ${accent}`}>
           System · {formatRelative(msg.created_at)}
@@ -488,7 +545,7 @@ function UserMessageRow({
   const longPress = useLongPress(onTogglePicker);
 
   return (
-    <div className={`flex ${align}`}>
+    <div className={`flex ${align}`} data-msg-id={msg.id}>
       <div className={`max-w-[80%] flex flex-col ${isMine ? 'items-end' : 'items-start'} gap-1`}>
         <div className={`text-[9px] font-display tracking-widest ${headerColor}`}>
           {!isMine && <span className="uppercase">{msg.display_name} · </span>}
