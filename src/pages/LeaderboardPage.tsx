@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { formatError } from '../lib/errors';
 import { ProfileDetailModal } from '../components/ProfileDetailModal';
 import { TierBadge } from '../components/TierBadge';
-import { ratingStatus } from '../lib/tiers';
+import { ratingStatus, PLACEMENT_GAMES } from '../lib/tiers';
 import type { Database } from '../lib/database.types';
 
 type Tab = 'singles' | 'doubles';
@@ -107,7 +107,7 @@ export function LeaderboardPage() {
         </section>
       ) : (
         <ol className="space-y-2">
-          {rows.map((p, i) => {
+          {orderForTab(rows, tab).map((p, i) => {
             const s = streaks.get(p.id);
             const streak = s ? (tab === 'singles' ? s.singles : s.doubles) : 0;
             return (
@@ -149,8 +149,8 @@ function Row({
 }) {
   const rating = tab === 'singles' ? profile.singles_rating : profile.doubles_rating;
   const games = tab === 'singles' ? profile.singles_games_played : profile.doubles_games_played;
-  const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null;
   const status = ratingStatus(rating, games);
+  const showMedal = (rank === 1 || rank === 2 || rank === 3) && status.kind === 'tier';
 
   // Per-tier row tint + accent border. Champions also pulse.
   const rowTintStyle: React.CSSProperties = {};
@@ -179,9 +179,13 @@ function Row({
         className="w-full p-3 flex items-center gap-3 text-left active:scale-[0.99] transition rounded-2xl"
         aria-label={`View ${profile.display_name}'s profile`}
       >
-        <div className="w-7 text-center font-display text-sm text-zinc-500 dark:text-zinc-400 shrink-0">
-          {medal ?? `#${rank}`}
-        </div>
+        {showMedal ? (
+          <Medal rank={rank as 1 | 2 | 3} />
+        ) : (
+          <div className="w-10 text-center font-display text-sm text-zinc-500 dark:text-zinc-400 shrink-0">
+            #{rank}
+          </div>
+        )}
 
       <Avatar profile={profile} streak={streak} />
 
@@ -313,3 +317,77 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
   );
 }
 
+// Tiered players come first (sorted by rating desc — already done by SQL),
+// placement players are grouped at the bottom. Within each group the
+// original SQL order is preserved.
+function orderForTab(rows: Profile[], tab: Tab): Profile[] {
+  const tiered: Profile[] = [];
+  const placement: Profile[] = [];
+  for (const p of rows) {
+    const games =
+      tab === 'singles' ? p.singles_games_played : p.doubles_games_played;
+    if (games < PLACEMENT_GAMES) placement.push(p);
+    else tiered.push(p);
+  }
+  return [...tiered, ...placement];
+}
+
+const MEDAL_STYLES: Record<
+  1 | 2 | 3,
+  { emoji: string; halo: string; ring: string; size: string }
+> = {
+  1: {
+    emoji: '🥇',
+    halo: 'rgba(251, 191, 36, 0.55)',
+    ring: 'rgba(251, 191, 36, 0.85)',
+    size: 'text-[26px]',
+  },
+  2: {
+    emoji: '🥈',
+    halo: 'rgba(212, 212, 216, 0.45)',
+    ring: 'rgba(212, 212, 216, 0.70)',
+    size: 'text-[22px]',
+  },
+  3: {
+    emoji: '🥉',
+    halo: 'rgba(251, 146, 60, 0.45)',
+    ring: 'rgba(251, 146, 60, 0.70)',
+    size: 'text-[22px]',
+  },
+};
+
+function Medal({ rank }: { rank: 1 | 2 | 3 }) {
+  const cfg = MEDAL_STYLES[rank];
+  return (
+    <div
+      className="relative w-10 h-10 flex items-center justify-center shrink-0"
+      aria-label={`Rank ${rank}`}
+    >
+      {/* outer halo */}
+      <span
+        className="absolute inset-0 rounded-full pointer-events-none"
+        style={{
+          background: `radial-gradient(circle, ${cfg.halo} 0%, transparent 70%)`,
+          animation:
+            rank === 1 ? 'pill-pulse 2.2s ease-in-out infinite' : undefined,
+        }}
+        aria-hidden
+      />
+      {/* thin ring for definition */}
+      <span
+        className="absolute inset-1 rounded-full pointer-events-none"
+        style={{
+          border: `1px solid ${cfg.ring}`,
+          boxShadow: `inset 0 0 6px ${cfg.halo}`,
+        }}
+        aria-hidden
+      />
+      <span
+        className={`relative z-10 leading-none ${cfg.size}`}
+        style={{ filter: `drop-shadow(0 1px 2px ${cfg.halo})` }}
+      >
+        {cfg.emoji}
+      </span>
+    </div>
+  );
+}

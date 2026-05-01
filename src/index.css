@@ -38,6 +38,20 @@
   }
 }
 
+/* Champion-tier row glow on the leaderboard. Pulses the purple aura
+   that's set inline as box-shadow. */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.20);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(168, 85, 247, 0.55);
+  }
+}
+.animate-pulse-glow {
+  animation: pulse-glow 2.6s ease-in-out infinite;
+}
+
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
