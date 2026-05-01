@@ -3,6 +3,8 @@ import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { formatError } from '../lib/errors';
 import { ProfileDetailModal } from '../components/ProfileDetailModal';
+import { TierBadge } from '../components/TierBadge';
+import { ratingStatus } from '../lib/tiers';
 import type { Database } from '../lib/database.types';
 
 type Tab = 'singles' | 'doubles';
@@ -148,12 +150,28 @@ function Row({
   const rating = tab === 'singles' ? profile.singles_rating : profile.doubles_rating;
   const games = tab === 'singles' ? profile.singles_games_played : profile.doubles_games_played;
   const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null;
+  const status = ratingStatus(rating, games);
+
+  // Per-tier row tint + accent border. Champions also pulse.
+  const rowTintStyle: React.CSSProperties = {};
+  let extraClass = '';
+  if (status.kind === 'tier') {
+    rowTintStyle.background = `linear-gradient(135deg, ${status.tier.rowBg} 0%, transparent 60%)`;
+    rowTintStyle.borderColor = status.tier.rowBorder;
+    if (status.tier.key === 'champion') {
+      extraClass = 'animate-pulse-glow';
+      rowTintStyle.boxShadow = '0 0 14px rgba(168, 85, 247, 0.25)';
+    } else if (status.tier.key === 'diamond') {
+      rowTintStyle.boxShadow = '0 0 8px rgba(34, 211, 238, 0.18)';
+    }
+  }
 
   return (
     <li
-      className={`glass-panel ${
+      className={`glass-panel ${extraClass} ${
         isMe ? 'ring-1 ring-cyan2-400/60' : ''
       }`}
+      style={rowTintStyle}
     >
       <button
         type="button"
@@ -195,8 +213,11 @@ function Row({
           )}
           {isMe && <span className="text-[9px] tracking-widest ml-1">· you</span>}
         </div>
-        <div className="text-[10px] text-zinc-500 dark:text-zinc-500 tracking-wider uppercase">
-          {games} {games === 1 ? 'game' : 'games'}
+        <div className="flex items-center gap-2 mt-0.5">
+          <TierBadge status={status} size={18} showName />
+          <span className="text-[10px] text-zinc-500 dark:text-zinc-500 tracking-wider uppercase">
+            · {games} {games === 1 ? 'game' : 'games'}
+          </span>
         </div>
       </div>
 

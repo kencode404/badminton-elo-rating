@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
+import { TierBadge } from '../components/TierBadge';
+import { ratingStatus } from '../lib/tiers';
 import { supabase } from '../lib/supabase';
 import { AvatarCropModal } from '../components/AvatarCropModal';
 import type { Database } from '../lib/database.types';
@@ -311,16 +313,20 @@ function Stat({
   wins: number;
 }) {
   const winRate = games > 0 ? Math.round((wins / games) * 100) : null;
+  const status = ratingStatus(rating, games);
   return (
     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
       <div className="text-[10px] font-display uppercase tracking-wider text-cyan2-500 dark:text-cyan2-300">
         {label}
       </div>
       <div className="font-display text-2xl mt-1 text-zinc-900 dark:text-zinc-100">{rating}</div>
-      <div className="text-[10px] text-zinc-500 dark:text-zinc-500 mt-0.5 uppercase tracking-wider">
+      <div className="mt-1">
+        <TierBadge status={status} size={20} showName />
+      </div>
+      <div className="text-[10px] text-zinc-500 dark:text-zinc-500 mt-1 uppercase tracking-wider">
         {games} games
       </div>
-      <div className="text-[10px] text-zinc-700 dark:text-zinc-300 mt-1 font-display tracking-wider">
+      <div className="text-[10px] text-zinc-700 dark:text-zinc-300 mt-0.5 font-display tracking-wider">
         {winRate !== null ? `${wins}W · ${winRate}%` : '— no games'}
       </div>
     </div>

@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom';
+import { TierBadge } from '../components/TierBadge';
+import { TIERS, PLACEMENT_GAMES } from '../lib/tiers';
 
 export function ScoringGuidePage() {
   return (
@@ -119,14 +121,53 @@ export function ScoringGuidePage() {
 
       <section className="glass-panel p-5">
         <h2 className="font-display tracking-[0.15em] text-sm text-zinc-900 dark:text-zinc-100 uppercase mb-2">
-          Your first 10 games
+          Placement matches
         </h2>
         <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
-          Brand-new players are <strong>provisional</strong> for their first 10
-          games (per mode). During this time your rating moves about{' '}
-          <strong>1.7× faster</strong> in either direction. This lets the system
-          find your real level quickly instead of leaving you stuck at 1200.
+          Brand-new players are in <strong>placement</strong> for their first{' '}
+          {PLACEMENT_GAMES} games (per mode). During this time your rating moves
+          about <strong>1.7× faster</strong> in either direction so the system
+          can find your real level quickly. No tier badge is shown until
+          placement is complete.
         </p>
+      </section>
+
+      <section className="glass-panel p-5">
+        <h2 className="font-display tracking-[0.15em] text-sm text-zinc-900 dark:text-zinc-100 uppercase mb-2">
+          Tiers
+        </h2>
+        <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed mb-3">
+          After placement, your rating maps to a tier. Climb by winning matches
+          you weren't expected to.
+        </p>
+        <ul className="space-y-2">
+          {TIERS.map((t, i) => {
+            const next = TIERS[i + 1];
+            const range = next
+              ? `${t.minRating}–${next.minRating - 1}`
+              : `${t.minRating}+`;
+            return (
+              <li
+                key={t.key}
+                className="flex items-center gap-3 rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 py-2"
+              >
+                <TierBadge
+                  status={{ kind: 'tier', tier: t }}
+                  size={22}
+                  showName={false}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-display tracking-wider uppercase text-zinc-900 dark:text-zinc-100">
+                    {t.name}
+                  </div>
+                  <div className="text-[10px] text-zinc-500 dark:text-zinc-500 uppercase tracking-widest">
+                    Rating {range}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       </section>
 
       <section className="glass-panel p-5">

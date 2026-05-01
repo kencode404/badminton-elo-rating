@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { formatError } from '../lib/errors';
+import { TierBadge } from './TierBadge';
+import { ratingStatus } from '../lib/tiers';
 import type { Database, MatchType, Team } from '../lib/database.types';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -192,6 +194,7 @@ function ModeStat({
   wins: number | null;
 }) {
   const winRate = wins !== null && games > 0 ? Math.round((wins / games) * 100) : null;
+  const status = rating !== null ? ratingStatus(rating, games) : null;
   return (
     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
       <div className="text-[10px] font-display uppercase tracking-wider text-cyan2-500 dark:text-cyan2-300">
@@ -200,10 +203,15 @@ function ModeStat({
       <div className="font-display text-2xl mt-1 text-zinc-900 dark:text-zinc-100">
         {rating ?? '—'}
       </div>
-      <div className="text-[10px] text-zinc-500 dark:text-zinc-500 mt-0.5 uppercase tracking-wider">
+      {status && (
+        <div className="mt-1">
+          <TierBadge status={status} size={18} showName />
+        </div>
+      )}
+      <div className="text-[10px] text-zinc-500 dark:text-zinc-500 mt-1 uppercase tracking-wider">
         {games} games
       </div>
-      <div className="text-[10px] text-zinc-700 dark:text-zinc-300 mt-1 font-display tracking-wider">
+      <div className="text-[10px] text-zinc-700 dark:text-zinc-300 mt-0.5 font-display tracking-wider">
         {winRate !== null ? `${wins}W · ${winRate}%` : '—'}
       </div>
     </div>

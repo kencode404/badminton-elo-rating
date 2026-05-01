@@ -26,7 +26,7 @@ All constants are exported from [`src/lib/elo.ts`](../src/lib/elo.ts). To change
 | `STARTING_RATING`     | 1200  | Initial rating for any new player, both singles and doubles.           |
 | `K_PROVISIONAL`       | 40    | K-factor used while a player is in their provisional period.           |
 | `K_ESTABLISHED`       | 24    | K-factor used after the provisional period.                            |
-| `PROVISIONAL_GAMES`   | 10    | Number of games (per rating type) before a player is "established".    |
+| `PROVISIONAL_GAMES`   | 5     | Number of games (per rating type) before a player is "established". Also drives the placement window in the UI. |
 | `ELO_DIVISOR`         | 400   | Standard ELO scaling factor in the expected-score formula.             |
 | `MATCH_EXPIRY_DAYS`   | 7     | A pending match auto-expires after this many days. No rating change.   |
 | `MARGIN_DEADBAND`     | 2     | Score differences ≤ this trigger no margin-of-victory boost.           |
@@ -36,7 +36,7 @@ All constants are exported from [`src/lib/elo.ts`](../src/lib/elo.ts). To change
 ### Why these values
 
 - **STARTING_RATING = 1200**: Common casual-game default. Lower than chess's 1500 because we don't want big negative deltas to push new players below 1000 too quickly.
-- **K_PROVISIONAL = 40 / PROVISIONAL_GAMES = 10**: With a small group (5–10 players), a player will hit 10 games quickly. A high K during this window lets the rating find its true level fast instead of crawling there over months.
+- **K_PROVISIONAL = 40 / PROVISIONAL_GAMES = 5**: A player hits 5 games quickly in a club setting. A high K during this window lets the rating find its true level fast instead of crawling there over months. The same threshold doubles as the UI "placement matches" window — no tier badge is shown until placement is complete.
 - **K_ESTABLISHED = 24**: Slightly higher than chess's 16 because a small population produces less data per player; we want ratings to stay responsive. Lower this to 16 once the active player base is comfortably past ~30 players.
 - **ELO_DIVISOR = 400**: Standard. Don't change unless you're switching to a different rating system entirely (e.g. Glicko).
 
@@ -230,3 +230,4 @@ If you're changing the *formula* (not just constants), also:
 | ---------- | --------------------------------------- | ----------------------------------------- |
 | 2026-04-29 | Initial system: K=40→24 after 10 games, start 1200, equal-split doubles, single-number scores, 7-day expiry. | App launch with 5–10 player group. |
 | 2026-04-30 | ELO_VERSION 1 → 2. Winner-only margin-of-victory multiplier added: `K_eff = K_base × min(2, 1 + max(0, diff − 2)/21)`. Loser keeps base K. | User feedback that a 21-2 win and a 21-19 win shouldn't reward identically. |
+| 2026-05-01 | `PROVISIONAL_GAMES` 10 → 5. UI tier system added (Bronze/Silver/Gold/Diamond/Champion) — pure presentation over rating. Tier brackets aligned to a future 1000 starting rating; current 1200 start lands in Silver intentionally. | Faster onboarding to "established" rating, plus visible progression goals. |

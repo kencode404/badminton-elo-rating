@@ -4,7 +4,7 @@
 export const STARTING_RATING = 1200;
 export const K_PROVISIONAL = 40;
 export const K_ESTABLISHED = 24;
-export const PROVISIONAL_GAMES = 10;
+export const PROVISIONAL_GAMES = 5;
 export const ELO_DIVISOR = 400;
 export const MATCH_EXPIRY_DAYS = 7;
 

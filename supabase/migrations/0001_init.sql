@@ -177,7 +177,7 @@ declare
   m record;
   k_provisional constant int := 40;
   k_established constant int := 24;
-  provisional_games constant int := 10;
+  provisional_games constant int := 5;
   elo_divisor constant numeric := 400;
   margin_deadband constant int := 2;
   margin_divisor constant numeric := 21;
