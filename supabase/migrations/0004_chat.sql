@@ -1,21 +1,19 @@
--- Replace streak_announcements with a unified chat_messages table.
+-- Club Chat schema: chat_messages (system streak announcements + user
+-- chat) + chat_reactions (one per user per message). Also adds the
+-- chat_last_seen_at column on profiles that drives the home-tab
+-- unread badge.
 --
--- This is the source of truth for both system streak announcements
--- (kind='system_streak') and future user chat (kind='user'), so the
--- Home club-chat panel renders one chronological stream and the
--- unread badge can count both kinds with a single query.
---
--- The migration drops the old streak_announcements table and
--- back-fills active streak rows from get_win_streaks() at the end so
--- the Home page stays populated. Safe to rerun.
+-- Folds together 0009_chat_last_seen.sql, 0010_chat_messages.sql,
+-- 0011_streak_history.sql, 0012_chat_reactions.sql, and
+-- 0013_chat_reactions_one_per_user.sql. Safe to rerun.
 
 -- =========================================================================
--- 1. Tear down old streak_announcements artefacts
+-- 1. profiles.chat_last_seen_at
 -- =========================================================================
 
-drop trigger if exists trg_refresh_streak_announcements on public.matches;
-drop function if exists public.refresh_streak_announcements();
-drop table if exists public.streak_announcements;
+alter table public.profiles
+  add column if not exists chat_last_seen_at timestamptz not null
+    default '1970-01-01 00:00:00+00';
 
 -- =========================================================================
 -- 2. Enum
@@ -27,7 +25,7 @@ exception when duplicate_object then null;
 end $$;
 
 -- =========================================================================
--- 3. Table
+-- 3. chat_messages
 -- =========================================================================
 
 create table if not exists public.chat_messages (
@@ -39,7 +37,6 @@ create table if not exists public.chat_messages (
   streak_count int,
   created_at timestamptz not null default now(),
   expires_at timestamptz,
-  -- Per-kind shape requirements
   check (
     (kind = 'system_streak'
       and user_id is not null
@@ -56,16 +53,6 @@ create table if not exists public.chat_messages (
 create index if not exists chat_messages_created_idx
   on public.chat_messages (created_at desc);
 
--- At most one active system_streak per (user, mode); user messages
--- aren't constrained.
-create unique index if not exists chat_messages_active_streak_unique
-  on public.chat_messages (user_id, match_type)
-  where kind = 'system_streak';
-
--- =========================================================================
--- 4. RLS
--- =========================================================================
-
 alter table public.chat_messages enable row level security;
 
 drop policy if exists "Chat messages readable by all" on public.chat_messages;
@@ -74,15 +61,12 @@ create policy "Chat messages readable by all"
   to authenticated
   using (true);
 
--- User chat messages: a signed-in user can post their own. System rows
--- are inserted by the trigger only (which runs SECURITY DEFINER).
 drop policy if exists "Users can post user chat messages" on public.chat_messages;
 create policy "Users can post user chat messages"
   on public.chat_messages for insert
   to authenticated
   with check (kind = 'user' and user_id = auth.uid());
 
--- Users may delete their own user chat messages.
 drop policy if exists "Users can delete own chat messages" on public.chat_messages;
 create policy "Users can delete own chat messages"
   on public.chat_messages for delete
@@ -90,7 +74,7 @@ create policy "Users can delete own chat messages"
   using (kind = 'user' and user_id = auth.uid());
 
 -- =========================================================================
--- 5. Trigger — keep streak chat rows in sync with confirmed matches
+-- 4. Streak announcement trigger (append-only)
 -- =========================================================================
 
 create or replace function public.refresh_chat_streak_messages()
@@ -107,12 +91,6 @@ begin
   for participant in
     select user_id, team from public.match_participants where match_id = new.id
   loop
-    -- Wipe any previous active streak announcement for this user+mode.
-    delete from public.chat_messages
-    where kind = 'system_streak'
-      and user_id = participant.user_id
-      and match_type = new.match_type;
-
     participant_won :=
       (participant.team = 'A' and new.score_a > new.score_b)
       or (participant.team = 'B' and new.score_b > new.score_a);
@@ -129,8 +107,8 @@ begin
     end if;
   end loop;
 
-  -- Lazy cleanup of expired streak rows. User chat messages with
-  -- expires_at = null are kept indefinitely.
+  -- Lazy cleanup of expired streak rows. User chat (expires_at = null)
+  -- is kept indefinitely.
   delete from public.chat_messages
   where kind = 'system_streak'
     and expires_at is not null
@@ -148,7 +126,50 @@ create trigger trg_refresh_chat_streak_messages
   execute function public.refresh_chat_streak_messages();
 
 -- =========================================================================
--- 6. Backfill — populate from current win streaks so Home isn't empty
+-- 5. chat_reactions (one per user per message)
+-- =========================================================================
+
+create table if not exists public.chat_reactions (
+  message_id uuid not null references public.chat_messages(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  emoji text not null check (length(emoji) between 1 and 16),
+  created_at timestamptz not null default now(),
+  primary key (message_id, user_id)
+);
+
+create index if not exists chat_reactions_message_idx
+  on public.chat_reactions (message_id);
+
+alter table public.chat_reactions enable row level security;
+
+drop policy if exists "Reactions readable by all" on public.chat_reactions;
+create policy "Reactions readable by all"
+  on public.chat_reactions for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Users react as themselves" on public.chat_reactions;
+create policy "Users react as themselves"
+  on public.chat_reactions for insert
+  to authenticated
+  with check (user_id = auth.uid());
+
+drop policy if exists "Users update own reactions" on public.chat_reactions;
+create policy "Users update own reactions"
+  on public.chat_reactions for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists "Users delete own reactions" on public.chat_reactions;
+create policy "Users delete own reactions"
+  on public.chat_reactions for delete
+  to authenticated
+  using (user_id = auth.uid());
+
+-- =========================================================================
+-- 6. Backfill — populate from current win streaks so a fresh install
+--                with existing matches doesn't have an empty chat
 -- =========================================================================
 
 insert into public.chat_messages

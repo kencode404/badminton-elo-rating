@@ -1,12 +1,19 @@
 -- Badminton ELO — consolidated schema (v2 ELO).
 -- Run this in the Supabase SQL editor for your project. Safe to rerun.
 --
--- This is the single source of truth for the schema. Earlier patch
--- migrations (0003–0005) have been folded back in; see git history for
--- the change rationale. To set up a fresh database, run:
---   1) 0001_init.sql       (this file)
---   2) 0002_avatars.sql    (avatars storage bucket + RLS)
---   3) 0006_win_streaks.sql (per-mode win-streak RPC)
+-- This is the single source of truth for the base schema. Earlier
+-- patch migrations have been folded back into this file plus the
+-- four sibling files below; see git history for the change rationale.
+-- To set up a fresh database, run in order:
+--   1) 0001_init.sql       — this file: base schema, ELO settlement,
+--                            RLS policies, expiry cron stub
+--   2) 0002_avatars.sql    — storage bucket for profile avatars + RLS
+--   3) 0003_user_stats.sql — leaderboard / profile RPCs (streaks,
+--                            win counts, recent matches)
+--   4) 0004_chat.sql       — chat_messages, chat_reactions, streak
+--                            announcement trigger, chat_last_seen_at
+--   5) 0005_realtime.sql   — adds chat tables + profiles to the
+--                            supabase_realtime publication
 --
 -- Constants (K-factor, starting rating, expiry days, margin tuning) are
 -- kept in sync with src/lib/elo.ts and docs/ELO_CALCULATION.md.
