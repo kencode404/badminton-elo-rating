@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type FormEvent,
+  type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
@@ -13,6 +14,32 @@ import { formatError } from '../lib/errors';
 import type { ChatMessageKind, MatchType } from '../lib/database.types';
 
 const REACTION_PALETTE = ['🔥', '👏', '😂', '❤️', '💪', '🤝'];
+const LONG_PRESS_MS = 450;
+
+function useLongPress(callback: () => void) {
+  const timer = useRef<number | null>(null);
+
+  const start = (e: ReactPointerEvent) => {
+    // Ignore right-click on desktop
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    timer.current = window.setTimeout(callback, LONG_PRESS_MS);
+  };
+  const cancel = () => {
+    if (timer.current !== null) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+  };
+
+  return {
+    onPointerDown: start,
+    onPointerUp: cancel,
+    onPointerCancel: cancel,
+    onPointerLeave: cancel,
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+    style: { touchAction: 'manipulation' as const },
+  };
+}
 
 interface ChatMsg {
   id: string;
@@ -125,6 +152,25 @@ export function ClubChat() {
     listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages]);
 
+  // Close the reaction picker on any outside tap or Escape.
+  useEffect(() => {
+    if (!pickerForMsg) return;
+    function maybeClose(e: PointerEvent) {
+      const t = e.target as HTMLElement | null;
+      if (t && t.closest('[data-reaction-picker]')) return;
+      setPickerForMsg(null);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setPickerForMsg(null);
+    }
+    document.addEventListener('pointerdown', maybeClose);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', maybeClose);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [pickerForMsg]);
+
   // Mark chat seen on mount and whenever the message list updates while
   // the user is on this page.
   useEffect(() => {
@@ -171,25 +217,27 @@ export function ClubChat() {
     [input, user],
   );
 
+  // One reaction per user per message: tapping the same emoji removes
+  // your reaction; tapping a different emoji replaces it.
   const toggleReaction = useCallback(
     async (messageId: string, emoji: string) => {
       if (!user) return;
-      const mine = reactions.some(
-        (r) => r.message_id === messageId && r.user_id === user.id && r.emoji === emoji,
+      const mine = reactions.find(
+        (r) => r.message_id === messageId && r.user_id === user.id,
       );
-      if (mine) {
+      if (mine && mine.emoji === emoji) {
         await supabase
           .from('chat_reactions')
           .delete()
           .eq('message_id', messageId)
-          .eq('user_id', user.id)
-          .eq('emoji', emoji);
+          .eq('user_id', user.id);
       } else {
-        await supabase.from('chat_reactions').insert({
-          message_id: messageId,
-          user_id: user.id,
-          emoji,
-        });
+        await supabase
+          .from('chat_reactions')
+          .upsert(
+            { message_id: messageId, user_id: user.id, emoji },
+            { onConflict: 'message_id,user_id' },
+          );
       }
       setPickerForMsg(null);
     },
@@ -314,15 +362,17 @@ function SystemStreakRow({
   const accent = challenge
     ? 'text-orange-500 dark:text-orange-400'
     : 'text-amber-500 dark:text-amber-400';
+  const longPress = useLongPress(onTogglePicker);
 
   return (
     <div className="flex justify-start">
-      <div className="max-w-[88%] flex flex-col items-start gap-1">
+      <div className="relative max-w-[88%] flex flex-col items-start gap-1">
         <div className={`text-[9px] font-display uppercase tracking-widest ${accent}`}>
           System · {formatRelative(msg.created_at)}
         </div>
         <div
-          className={`rounded-2xl rounded-bl-md px-3 py-1.5 text-[12px] leading-snug ${
+          {...longPress}
+          className={`rounded-2xl rounded-bl-md px-3 py-1.5 text-[12px] leading-snug select-none cursor-pointer ${
             challenge
               ? 'bg-orange-500/10 dark:bg-orange-500/15 text-zinc-800 dark:text-zinc-100'
               : 'bg-amber-500/10 dark:bg-amber-500/15 text-zinc-800 dark:text-zinc-100'
@@ -330,11 +380,12 @@ function SystemStreakRow({
         >
           {text}
         </div>
+        {pickerOpen && (
+          <ReactionPicker alignRight={false} onPick={onToggleReaction} />
+        )}
         <ReactionsBar
           reactions={reactions}
           currentUserId={currentUserId}
-          pickerOpen={pickerOpen}
-          onTogglePicker={onTogglePicker}
           onToggleReaction={onToggleReaction}
         />
       </div>
@@ -366,24 +417,29 @@ function UserMessageRow({
   const headerColor = isMine
     ? 'text-cyan2-600 dark:text-cyan2-300'
     : 'text-zinc-600 dark:text-zinc-400';
+  const longPress = useLongPress(onTogglePicker);
 
   return (
     <div className={`flex ${align}`}>
-      <div className={`max-w-[80%] flex flex-col ${isMine ? 'items-end' : 'items-start'} gap-1`}>
+      <div className={`relative max-w-[80%] flex flex-col ${isMine ? 'items-end' : 'items-start'} gap-1`}>
         <div className={`text-[9px] font-display tracking-widest ${headerColor}`}>
           {!isMine && <span className="uppercase">{msg.display_name} · </span>}
           <span className="text-zinc-500 dark:text-zinc-500">
             {formatRelative(msg.created_at)}
           </span>
         </div>
-        <div className={`px-3 py-1.5 text-[13px] leading-snug ${bubbleClass}`}>
+        <div
+          {...longPress}
+          className={`px-3 py-1.5 text-[13px] leading-snug select-none cursor-pointer ${bubbleClass}`}
+        >
           {msg.body}
         </div>
+        {pickerOpen && (
+          <ReactionPicker alignRight={isMine} onPick={onToggleReaction} />
+        )}
         <ReactionsBar
           reactions={reactions}
           currentUserId={currentUserId}
-          pickerOpen={pickerOpen}
-          onTogglePicker={onTogglePicker}
           onToggleReaction={onToggleReaction}
           alignRight={isMine}
         />
@@ -395,20 +451,16 @@ function UserMessageRow({
 function ReactionsBar({
   reactions,
   currentUserId,
-  pickerOpen,
-  onTogglePicker,
   onToggleReaction,
   alignRight = false,
 }: {
   reactions: Map<string, Reaction[]>;
   currentUserId: string | null;
-  pickerOpen: boolean;
-  onTogglePicker: () => void;
   onToggleReaction: (emoji: string) => void;
   alignRight?: boolean;
 }) {
-  const entries = Array.from(reactions.entries()); // [[emoji, [reactions...]], ...]
-
+  const entries = Array.from(reactions.entries());
+  if (entries.length === 0) return null;
   return (
     <div className={`flex flex-wrap gap-1 items-center ${alignRight ? 'justify-end' : ''}`}>
       {entries.map(([emoji, list]) => {
@@ -432,36 +484,36 @@ function ReactionsBar({
           </button>
         );
       })}
+    </div>
+  );
+}
 
-      <div className="relative">
+// Floating emoji palette shown above the message bubble after a long-press.
+function ReactionPicker({
+  alignRight,
+  onPick,
+}: {
+  alignRight: boolean;
+  onPick: (emoji: string) => void;
+}) {
+  return (
+    <div
+      data-reaction-picker
+      className={`absolute bottom-full mb-1 ${
+        alignRight ? 'right-0' : 'left-0'
+      } z-30 flex gap-1 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-lg p-1`}
+    >
+      {REACTION_PALETTE.map((e) => (
         <button
+          key={e}
           type="button"
-          onClick={onTogglePicker}
-          className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[11px] text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
-          aria-label="Add reaction"
+          onClick={() => onPick(e)}
+          className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition text-lg"
+          aria-label={`React with ${e}`}
         >
-          +
+          {e}
         </button>
-        {pickerOpen && (
-          <div
-            className={`absolute bottom-full mb-1 ${
-              alignRight ? 'right-0' : 'left-0'
-            } z-30 flex gap-1 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-lg p-1`}
-          >
-            {REACTION_PALETTE.map((e) => (
-              <button
-                key={e}
-                type="button"
-                onClick={() => onToggleReaction(e)}
-                className="inline-flex items-center justify-center w-7 h-7 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition text-base"
-                aria-label={`React with ${e}`}
-              >
-                {e}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      ))}
     </div>
   );
 }
