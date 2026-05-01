@@ -72,6 +72,34 @@ mode is on.
 
 ---
 
+## `?preview=tiers` — Profile stat-card preview
+
+**URL:** `/profile?preview=tiers`
+**Source:** [src/pages/ProfilePage.tsx](../src/pages/ProfilePage.tsx)
+
+Adds an extra "Preview" section above *Past Seasons Record* with one
+mock `Stat` card per tier (Bronze through Predator) plus a Placement
+card, so the per-tier accent border + tinted background applied to
+**Current Season** cards is visible across every tier without
+needing matches at each rating bracket.
+
+Each preview card uses a rating parked in the middle of its bracket
+so the bar shows roughly 50% progress.
+
+| Card label | Mock rating         | Notes                              |
+| ---------- | ------------------- | ---------------------------------- |
+| Bronze     | mid of 0–1099       | Bronze border + warm-brown tint    |
+| Silver     | mid of 1100–1249    |                                    |
+| Gold       | mid of 1250–1399    |                                    |
+| Diamond    | mid of 1400–1599    | Cyan accent                        |
+| Predator   | 1680                | Red accent (top tier)              |
+| Placement  | 1000, 2 games       | Neutral grey border, no tier       |
+
+Real *Current Season* card stays visible above the preview block —
+nothing is overwritten.
+
+---
+
 ## Adding a new preview mode
 
 1. Pick a query param key (e.g. `?preview=newthing`) and read it via

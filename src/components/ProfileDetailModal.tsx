@@ -195,8 +195,18 @@ function ModeStat({
 }) {
   const winRate = wins !== null && games > 0 ? Math.round((wins / games) * 100) : null;
   const status = rating !== null ? ratingStatus(rating, games) : null;
+  const tintStyle: React.CSSProperties =
+    status?.kind === 'tier'
+      ? {
+          borderColor: status.tier.rowBorder,
+          background: `linear-gradient(135deg, ${status.tier.rowBg} 0%, transparent 60%)`,
+        }
+      : {};
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+    <div
+      className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3"
+      style={tintStyle}
+    >
       <div className="text-[10px] font-display uppercase tracking-wider text-cyan2-500 dark:text-cyan2-300">
         {label}
       </div>

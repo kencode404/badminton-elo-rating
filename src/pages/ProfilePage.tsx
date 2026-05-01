@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { TierBadge } from '../components/TierBadge';
-import { ratingStatus } from '../lib/tiers';
+import { ratingStatus, TIERS } from '../lib/tiers';
 import { supabase } from '../lib/supabase';
 import { AvatarCropModal } from '../components/AvatarCropModal';
 import type { Database } from '../lib/database.types';
@@ -11,6 +11,8 @@ type Profile = Database['public']['Tables']['profiles']['Row'];
 
 export function ProfilePage() {
   const { user, signOut } = useAuth();
+  const [searchParams] = useSearchParams();
+  const previewMode = searchParams.get('preview') === 'tiers';
   const [profile, setProfile] = useState<Profile | null>(null);
   const [winCounts, setWinCounts] = useState<{ singles: number; doubles: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -246,6 +248,34 @@ export function ProfilePage() {
         )}
       </section>
 
+      {previewMode && (
+        <section className="glass-panel p-5">
+          <div className="text-[10px] font-display tracking-widest uppercase text-cyan2-500 dark:text-cyan2-300 bg-cyan2-500/5 border border-cyan2-400/30 rounded-md px-3 py-2 mb-3">
+            Preview · mock per-tier stat cards
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {TIERS.map((t, i) => {
+              // Park each preview rating in the middle of its bracket so
+              // the progress bar shows ~50% for every card.
+              const next = TIERS[i + 1];
+              const previewRating = next
+                ? Math.round((t.minRating + next.minRating - 1) / 2)
+                : t.minRating + 80;
+              return (
+                <Stat
+                  key={t.key}
+                  label={t.name}
+                  rating={previewRating}
+                  games={20}
+                  wins={12}
+                />
+              );
+            })}
+            <Stat label="Placement" rating={1000} games={2} wins={1} />
+          </div>
+        </section>
+      )}
+
       <section className="glass-panel p-5">
         <div className="section-title mb-3">Past Seasons Record</div>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -314,8 +344,21 @@ function Stat({
 }) {
   const winRate = games > 0 ? Math.round((wins / games) * 100) : null;
   const status = ratingStatus(rating, games);
+  // After placement, the card picks up the tier's accent border + a
+  // soft tier-tinted background so the card matches what the player
+  // sees on the leaderboard. Placement cards stay neutral.
+  const tintStyle: React.CSSProperties =
+    status.kind === 'tier'
+      ? {
+          borderColor: status.tier.rowBorder,
+          background: `linear-gradient(135deg, ${status.tier.rowBg} 0%, transparent 60%)`,
+        }
+      : {};
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+    <div
+      className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3"
+      style={tintStyle}
+    >
       <div className="text-[10px] font-display uppercase tracking-wider text-cyan2-500 dark:text-cyan2-300">
         {label}
       </div>
