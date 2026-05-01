@@ -15,6 +15,7 @@ import type { ChatMessageKind, MatchType } from '../lib/database.types';
 
 const REACTION_PALETTE = ['🔥', '👏', '😂', '❤️', '💪', '🤝', '😠', '😢'];
 const LONG_PRESS_MS = 450;
+const UNSEND_WINDOW_MS = 10 * 60 * 1000;
 
 function useLongPress(callback: () => void) {
   const timer = useRef<number | null>(null);
@@ -255,6 +256,21 @@ export function ClubChat() {
     [input, user],
   );
 
+  const unsendMessage = useCallback(
+    async (messageId: string) => {
+      const { error } = await supabase
+        .from('chat_messages')
+        .delete()
+        .eq('id', messageId);
+      if (error) {
+        setError(formatError(error));
+        return;
+      }
+      setPickerForMsg(null);
+    },
+    [],
+  );
+
   // One reaction per user per message: tapping the same emoji removes
   // your reaction; tapping a different emoji replaces it.
   const toggleReaction = useCallback(
@@ -327,6 +343,7 @@ export function ClubChat() {
                 setReactorsForMsg((id) => (id === m.id ? null : m.id));
               }}
               onToggleReaction={(emoji) => toggleReaction(m.id, emoji)}
+              onUnsend={() => unsendMessage(m.id)}
             />
           ))
         )}
@@ -373,6 +390,7 @@ interface RowProps {
   onTogglePicker: () => void;
   onShowReactors: () => void;
   onToggleReaction: (emoji: string) => void;
+  onUnsend: () => void;
 }
 
 function MessageRow(props: RowProps) {
@@ -456,6 +474,7 @@ function UserMessageRow({
   onTogglePicker,
   onShowReactors,
   onToggleReaction,
+  onUnsend,
 }: RowProps) {
   const align = isMine ? 'justify-end' : 'justify-start';
   const bubbleClass = isMine
@@ -490,6 +509,8 @@ function UserMessageRow({
             alignRight={isMine}
             currentEmoji={findMyEmoji(reactions, currentUserId)}
             onPick={onToggleReaction}
+            canUnsend={isMine && Date.now() - new Date(msg.created_at).getTime() < UNSEND_WINDOW_MS}
+            onUnsend={onUnsend}
           />
         )}
         <ReactionsBar
@@ -699,14 +720,18 @@ function ReactionPicker({
   alignRight,
   currentEmoji,
   onPick,
+  canUnsend = false,
+  onUnsend,
 }: {
   anchorRef: React.RefObject<HTMLElement | null>;
   alignRight: boolean;
   currentEmoji: string | null;
   onPick: (emoji: string) => void;
+  canUnsend?: boolean;
+  onUnsend?: () => void;
 }) {
   const PICKER_HEIGHT = 48;
-  const PICKER_WIDTH_EST = 320;
+  const PICKER_WIDTH_EST = 360;
   const PADDING = 8;
 
   const computePos = useCallback(() => {
@@ -771,6 +796,24 @@ function ReactionPicker({
           </button>
         );
       })}
+      {canUnsend && onUnsend && (
+        <>
+          <span className="w-px self-stretch my-1 bg-zinc-200 dark:bg-zinc-700" aria-hidden />
+          <button
+            type="button"
+            onClick={onUnsend}
+            className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-red-500/15 transition text-zinc-500 dark:text-zinc-400 hover:text-red-500"
+            aria-label="Unsend message"
+            title="Unsend"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M3 6h18" />
+              <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
+            </svg>
+          </button>
+        </>
+      )}
     </div>
   );
 }

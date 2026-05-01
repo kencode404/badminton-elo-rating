@@ -67,11 +67,18 @@ create policy "Users can post user chat messages"
   to authenticated
   with check (kind = 'user' and user_id = auth.uid());
 
+-- Unsend window: users can delete their own user messages for 10
+-- minutes after sending. Enforced server-side; the client hides the
+-- unsend button once the window closes.
 drop policy if exists "Users can delete own chat messages" on public.chat_messages;
 create policy "Users can delete own chat messages"
   on public.chat_messages for delete
   to authenticated
-  using (kind = 'user' and user_id = auth.uid());
+  using (
+    kind = 'user'
+    and user_id = auth.uid()
+    and created_at > now() - interval '10 minutes'
+  );
 
 -- =========================================================================
 -- 4. Streak announcement trigger (append-only)
