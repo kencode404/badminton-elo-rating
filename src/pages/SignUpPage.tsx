@@ -92,7 +92,7 @@ export function SignUpPage() {
             autoComplete="nickname"
             required
             minLength={1}
-            maxLength={40}
+            maxLength={15}
           />
           <Field
             label="Email"

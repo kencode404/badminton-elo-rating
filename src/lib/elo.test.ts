@@ -220,8 +220,8 @@ describe('calculateMatch — doubles', () => {
 });
 
 describe('starting rating constant', () => {
-  it('is 1200 as documented', () => {
-    expect(STARTING_RATING).toBe(1200);
+  it('is 1000 as documented', () => {
+    expect(STARTING_RATING).toBe(1000);
   });
 });
 

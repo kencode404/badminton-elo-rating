@@ -1,7 +1,7 @@
 // Pure ELO calculation module. No DB calls, no side effects.
 // See docs/ELO_CALCULATION.md for full math reference, examples, and rationale.
 
-export const STARTING_RATING = 1200;
+export const STARTING_RATING = 1000;
 export const K_PROVISIONAL = 40;
 export const K_ESTABLISHED = 24;
 export const PROVISIONAL_GAMES = 5;

@@ -1,6 +1,28 @@
 import { useId } from 'react';
 import type { RatingStatus, TierKey } from '../lib/tiers';
 
+// Per-tier idle animations. Lower tiers stay static (a busy list with
+// every row twitching reads as noise); Gold gets a quiet glint and the
+// top two tiers earn the big shimmer / pulse.
+const TIER_ANIMATION: Record<TierKey, string | undefined> = {
+  bronze: undefined,
+  silver: undefined,
+  gold: 'tier-glint-gold 3.8s ease-in-out infinite',
+  diamond: 'tier-shimmer-diamond 2.6s ease-in-out infinite',
+  predator: 'tier-pulse-predator 2.2s ease-in-out infinite',
+};
+
+// Per-tier custom artwork. Tiers in this map use the PNG instead of
+// the procedurally-drawn SVG. Useful for hand-crafted badges that
+// would be too detailed to draw with primitives.
+const TIER_IMAGE: Partial<Record<TierKey, string>> = {
+  bronze: '/bronze-tier.png',
+  silver: '/silver-tier.png',
+  gold: '/gold-tier.png',
+  diamond: '/diamond-tier.png',
+  predator: '/predator-tier.png',
+};
+
 interface Props {
   status: RatingStatus;
   size?: number;        // px, default 22
@@ -9,32 +31,55 @@ interface Props {
 }
 
 // LoL-style tier badge. Hex for Bronze/Silver/Gold, faceted rhombus for
-// Diamond, crown for Champion, with metallic gradients + a subtle inner
+// Diamond, crown for Predator, with metallic gradients + a subtle inner
 // highlight to give the icon depth on flat backgrounds.
 export function TierBadge({ status, size = 22, showName = false, className = '' }: Props) {
   if (status.kind === 'placement') {
+    // Vertical stack when a label is requested so the "Placement X/Y"
+    // text never overflows the column width.
+    const wrapperClass = showName
+      ? `inline-flex flex-col items-center gap-1 ${className}`
+      : `inline-flex items-center gap-1 ${className}`;
     return (
       <span
-        className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 border border-zinc-300 dark:border-zinc-700 bg-zinc-100/80 dark:bg-zinc-800/60 text-[10px] font-display uppercase tracking-widest text-zinc-600 dark:text-zinc-300 ${className}`}
+        className={wrapperClass}
         title={`Placement match ${status.gamesPlayed}/${status.gamesNeeded}`}
       >
-        <PlacementIcon size={size - 6} />
-        <span>
-          Placement {status.gamesPlayed}/{status.gamesNeeded}
-        </span>
+        <PlacementIcon size={size} />
+        {showName && (
+          <span className="text-[10px] font-display uppercase tracking-widest leading-none text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
+            Placement {status.gamesPlayed}/{status.gamesNeeded}
+          </span>
+        )}
       </span>
     );
   }
   const t = status.tier;
+  const imageSrc = TIER_IMAGE[t.key];
+  const animation = TIER_ANIMATION[t.key];
+  // When showName is true the layout switches to a vertical stack —
+  // icon on top, label underneath. That way long labels (e.g.
+  // "Predator") never overflow the parent column.
+  const wrapperClass = showName
+    ? `inline-flex flex-col items-center gap-0.5 ${className}`
+    : `inline-flex items-center gap-1 ${className}`;
   return (
-    <span
-      className={`inline-flex items-center gap-1 ${className}`}
-      title={t.name}
-    >
-      <TierIcon tierKey={t.key} fromColor={t.fromColor} toColor={t.toColor} size={size} />
+    <span className={wrapperClass} title={t.name}>
+      {imageSrc ? (
+        <img
+          src={imageSrc}
+          alt=""
+          width={size}
+          height={size}
+          className="shrink-0 object-contain"
+          style={animation ? { animation } : undefined}
+        />
+      ) : (
+        <TierIcon tierKey={t.key} fromColor={t.fromColor} toColor={t.toColor} size={size} />
+      )}
       {showName && (
         <span
-          className="text-[10px] font-display uppercase tracking-widest"
+          className="text-[10px] font-display uppercase tracking-widest leading-none"
           style={{ color: t.toColor }}
         >
           {t.name}
@@ -60,6 +105,7 @@ function TierIcon({
   const innerId = `ti-${idBase}-${tierKey}`;
   const glowId = `gl-${idBase}-${tierKey}`;
 
+  const animation = TIER_ANIMATION[tierKey];
   return (
     <svg
       width={size}
@@ -67,6 +113,7 @@ function TierIcon({
       viewBox="0 0 24 24"
       aria-hidden
       className="shrink-0"
+      style={animation ? { animation } : undefined}
     >
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
@@ -86,7 +133,7 @@ function TierIcon({
       </defs>
 
       {/* Soft outer glow for higher tiers */}
-      {(tierKey === 'diamond' || tierKey === 'champion') && (
+      {(tierKey === 'diamond' || tierKey === 'predator') && (
         <circle cx="12" cy="12" r="11" fill={`url(#${glowId})`} />
       )}
 
@@ -94,7 +141,7 @@ function TierIcon({
       {tierKey === 'silver' && <SilverShape gradId={gradId} innerId={innerId} />}
       {tierKey === 'gold' && <GoldShape gradId={gradId} innerId={innerId} />}
       {tierKey === 'diamond' && <DiamondShape gradId={gradId} />}
-      {tierKey === 'champion' && <ChampionShape gradId={gradId} innerId={innerId} />}
+      {tierKey === 'predator' && <PredatorShape gradId={gradId} innerId={innerId} />}
     </svg>
   );
 }
@@ -216,8 +263,9 @@ function DiamondShape({ gradId }: { gradId: string }) {
   );
 }
 
-// Crown silhouette in fiery gradient — top tier.
-function ChampionShape({ gradId, innerId }: { gradId: string; innerId: string }) {
+// Crown silhouette in fiery gradient — top tier (used as fallback if
+// the Predator image is unavailable).
+function PredatorShape({ gradId, innerId }: { gradId: string; innerId: string }) {
   return (
     <g>
       {/* Crown body: zigzag top, flat base, with three points */}

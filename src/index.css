@@ -38,18 +38,89 @@
   }
 }
 
-/* Champion-tier row glow on the leaderboard. Pulses the purple aura
+/* Predator-tier row glow on the leaderboard. Pulses the red aura
    that's set inline as box-shadow. */
 @keyframes pulse-glow {
   0%, 100% {
-    box-shadow: 0 0 10px rgba(168, 85, 247, 0.20);
+    box-shadow:
+      0 0 10px rgba(239, 68, 68, 0.30),
+      0 0 0 1px rgba(239, 68, 68, 0.35);
   }
   50% {
-    box-shadow: 0 0 22px rgba(168, 85, 247, 0.55);
+    box-shadow:
+      0 0 36px rgba(239, 68, 68, 0.75),
+      0 0 64px rgba(252, 165, 165, 0.40),
+      0 0 0 2px rgba(252, 165, 165, 0.60);
   }
 }
 .animate-pulse-glow {
   animation: pulse-glow 2.6s ease-in-out infinite;
+}
+
+/* Per-tier badge animations. Applied via inline animation style on
+   the TierBadge SVG so all instances of a tier feel alive. */
+@keyframes tier-shimmer-diamond {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 3px rgba(34, 211, 238, 0.55))
+            brightness(1);
+  }
+  50% {
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 8px rgba(165, 243, 252, 0.95))
+            brightness(1.18);
+  }
+}
+
+@keyframes tier-pulse-predator {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.65))
+            brightness(1);
+  }
+  50% {
+    transform: scale(1.1) rotate(-2deg);
+    filter: drop-shadow(0 0 14px rgba(252, 165, 165, 0.95))
+            brightness(1.2);
+  }
+}
+
+@keyframes tier-glint-gold {
+  0%, 100% {
+    filter: drop-shadow(0 0 1px rgba(250, 204, 21, 0.4))
+            brightness(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 5px rgba(254, 240, 138, 0.8))
+            brightness(1.12);
+  }
+}
+
+/* Diamond+ row sweep — a translucent band that travels left to right
+   periodically. The band is contained in an overflow-hidden wrapper
+   inside the row so streak-burst sparks (which sit on the avatar)
+   are not clipped. */
+@keyframes row-sweep {
+  0% {
+    transform: translateX(-140%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  35%, 100% {
+    transform: translateX(140%);
+    opacity: 0;
+  }
+}
+.row-sweep-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  animation: row-sweep 3.6s ease-in-out infinite;
 }
 
 @layer base {

@@ -173,7 +173,7 @@ export function ProfilePage() {
               autoFocus
               value={nameDraft}
               onChange={(e) => setNameDraft(e.target.value)}
-              maxLength={40}
+              maxLength={15}
               className="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-center text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-cyan2-400 focus:ring-1 focus:ring-cyan2-400/40"
             />
             <div className="flex gap-2">
@@ -221,7 +221,7 @@ export function ProfilePage() {
       )}
 
       <section className="glass-panel p-5">
-        <div className="section-title mb-3">Ratings</div>
+        <div className="section-title mb-3">Current Season</div>
         {loading ? (
           <p className="text-sm text-zinc-500 dark:text-zinc-500">Loading…</p>
         ) : profile ? (

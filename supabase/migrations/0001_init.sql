@@ -48,10 +48,10 @@ end $$;
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
-  display_name text not null check (char_length(display_name) between 1 and 40),
+  display_name text not null check (char_length(display_name) between 1 and 15),
   avatar_url text,
-  singles_rating int not null default 1200,
-  doubles_rating int not null default 1200,
+  singles_rating int not null default 1000,
+  doubles_rating int not null default 1000,
   singles_games_played int not null default 0 check (singles_games_played >= 0),
   doubles_games_played int not null default 0 check (doubles_games_played >= 0),
   created_at timestamptz not null default now()
@@ -71,7 +71,13 @@ begin
   insert into public.profiles (id, display_name)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1))
+    left(
+      coalesce(
+        new.raw_user_meta_data->>'display_name',
+        split_part(new.email, '@', 1)
+      ),
+      15
+    )
   );
   return new;
 end;

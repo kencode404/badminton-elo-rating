@@ -1,9 +1,8 @@
 // Rating → tier mapping. Tiers are pure presentation; the underlying
-// ELO is the source of truth. Brackets are aligned to a 1000 starting
-// rating (used by future seasonal reset). Until then, fresh players
-// start at 1200 (Silver) — that is intentional.
+// ELO is the source of truth. Brackets are aligned to the 1000
+// starting rating, so fresh signups land in Bronze and climb up.
 
-export type TierKey = 'bronze' | 'silver' | 'gold' | 'diamond' | 'champion';
+export type TierKey = 'bronze' | 'silver' | 'gold' | 'diamond' | 'predator';
 
 export interface TierDef {
   key: TierKey;
@@ -55,13 +54,13 @@ export const TIERS: TierDef[] = [
     rowBg: 'rgba(34, 211, 238, 0.08)',
   },
   {
-    key: 'champion',
-    name: 'Champion',
+    key: 'predator',
+    name: 'Predator',
     minRating: 1600,
-    fromColor: '#f97316',
-    toColor: '#7c3aed',
-    rowBorder: 'rgba(244, 114, 182, 0.65)',
-    rowBg: 'rgba(168, 85, 247, 0.10)',
+    fromColor: '#fecaca',
+    toColor: '#991b1b',
+    rowBorder: 'rgba(239, 68, 68, 0.65)',
+    rowBg: 'rgba(220, 38, 38, 0.10)',
   },
 ];
 

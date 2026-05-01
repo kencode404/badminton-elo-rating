@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { formatError } from '../lib/errors';
@@ -12,11 +13,22 @@ type Profile = Database['public']['Tables']['profiles']['Row'];
 
 export function LeaderboardPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const previewMode = searchParams.get('preview') === 'tiers';
   const [tab, setTab] = useState<Tab>('doubles');
   const [rows, setRows] = useState<Profile[] | null>(null);
   const [streaks, setStreaks] = useState<Map<string, { singles: number; doubles: number }>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [openUserId, setOpenUserId] = useState<string | null>(null);
+
+  const displayedRows = useMemo(() => {
+    if (!rows) return null;
+    if (!previewMode) return rows;
+    // Prepend mock players (one per tier + a placement player) so all
+    // row styling can be inspected on a freshly-seeded club. Real
+    // rows still render below the mocks.
+    return [...buildPreviewRows(tab), ...rows];
+  }, [rows, tab, previewMode]);
 
   useEffect(() => {
     let active = true;
@@ -96,9 +108,15 @@ export function LeaderboardPage() {
         </div>
       )}
 
-      {rows === null ? (
+      {previewMode && (
+        <div className="text-[10px] font-display tracking-widest uppercase text-cyan2-500 dark:text-cyan2-300 bg-cyan2-500/5 border border-cyan2-400/30 rounded-md px-3 py-2">
+          Preview mode · mock players prepended for tier styling check
+        </div>
+      )}
+
+      {displayedRows === null ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-500">Loading…</p>
-      ) : rows.length === 0 ? (
+      ) : displayedRows.length === 0 ? (
         <section className="glass-panel p-6 text-center">
           <div className="text-3xl mb-2 text-cyan2-400" aria-hidden>✦</div>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -107,7 +125,7 @@ export function LeaderboardPage() {
         </section>
       ) : (
         <ol className="space-y-2">
-          {orderForTab(rows, tab).map((p, i) => {
+          {orderForTab(displayedRows, tab).map((p, i) => {
             const s = streaks.get(p.id);
             const streak = s ? (tab === 'singles' ? s.singles : s.doubles) : 0;
             return (
@@ -152,27 +170,51 @@ function Row({
   const status = ratingStatus(rating, games);
   const showMedal = (rank === 1 || rank === 2 || rank === 3) && status.kind === 'tier';
 
-  // Per-tier row tint + accent border. Champions also pulse.
+  // Per-tier row tint + accent border. Predator rows also pulse, and
+  // Diamond/Predator rows get an electric sweep band traveling
+  // left-to-right.
   const rowTintStyle: React.CSSProperties = {};
   let extraClass = '';
+  let sweepGradient: string | null = null;
+  let sweepDelay = '0s';
   if (status.kind === 'tier') {
     rowTintStyle.background = `linear-gradient(135deg, ${status.tier.rowBg} 0%, transparent 60%)`;
     rowTintStyle.borderColor = status.tier.rowBorder;
-    if (status.tier.key === 'champion') {
+    if (status.tier.key === 'predator') {
       extraClass = 'animate-pulse-glow';
-      rowTintStyle.boxShadow = '0 0 14px rgba(168, 85, 247, 0.25)';
+      rowTintStyle.boxShadow = '0 0 14px rgba(239, 68, 68, 0.30)';
+      sweepGradient =
+        'linear-gradient(90deg, transparent 0%, rgba(252, 165, 165, 0) 25%, rgba(252, 165, 165, 0.60) 50%, rgba(239, 68, 68, 0) 75%, transparent 100%)';
+      sweepDelay = '1.2s';
     } else if (status.tier.key === 'diamond') {
       rowTintStyle.boxShadow = '0 0 8px rgba(34, 211, 238, 0.18)';
+      sweepGradient =
+        'linear-gradient(90deg, transparent 0%, rgba(165, 243, 252, 0) 25%, rgba(165, 243, 252, 0.55) 50%, rgba(34, 211, 238, 0) 75%, transparent 100%)';
     }
   }
 
   return (
     <li
-      className={`glass-panel ${extraClass} ${
+      className={`glass-panel relative ${extraClass} ${
         isMe ? 'ring-1 ring-cyan2-400/60' : ''
       }`}
       style={rowTintStyle}
     >
+      {sweepGradient && (
+        <div
+          className="absolute inset-0 overflow-hidden pointer-events-none"
+          style={{ borderRadius: 'inherit' }}
+          aria-hidden
+        >
+          <span
+            className="row-sweep-band"
+            style={{
+              background: sweepGradient,
+              animationDelay: sweepDelay,
+            }}
+          />
+        </div>
+      )}
       <button
         type="button"
         onClick={onClick}
@@ -222,8 +264,8 @@ function Row({
         </div>
       </div>
 
-        <div className="shrink-0 w-[88px] flex flex-col items-end gap-1">
-          <TierBadge status={status} size={20} showName />
+        <div className="shrink-0 w-[92px] flex flex-col items-center gap-2 self-start">
+          <TierBadge status={status} size={tierBadgeSize(status)} showName />
           <TierProgress status={status} rating={rating} />
         </div>
       </button>
@@ -322,14 +364,14 @@ function TierProgress({ status, rating }: { status: RatingStatus; rating: number
   const tier = status.tier;
   const next = TIERS.find((t) => t.minRating > tier.minRating);
   if (!next) {
-    // Champion / max tier — full bar in champion gradient.
+    // Predator / max tier — full bar in predator red gradient.
     return (
       <div className="w-full h-1 rounded-full overflow-hidden">
         <div
           className="h-full w-full"
           style={{
-            background: 'linear-gradient(90deg, #f97316, #a855f7)',
-            boxShadow: '0 0 6px rgba(168, 85, 247, 0.55)',
+            background: 'linear-gradient(90deg, #fca5a5, #991b1b)',
+            boxShadow: '0 0 6px rgba(239, 68, 68, 0.55)',
           }}
         />
       </div>
@@ -353,6 +395,46 @@ function ProgressBar({ pct }: { pct: number }) {
       />
     </div>
   );
+}
+
+// Per-tier badge size on the leaderboard row. Higher tiers render
+// bigger so the climb is visible at a glance — Predator stands out,
+// Bronze/placement stay modest.
+function tierBadgeSize(status: RatingStatus): number {
+  if (status.kind === 'placement') return 36;
+  switch (status.tier.key) {
+    case 'bronze':   return 38;
+    case 'silver':   return 42;
+    case 'gold':     return 46;
+    case 'diamond':  return 50;
+    case 'predator': return 54;
+  }
+}
+
+// Mock leaderboard rows used by ?preview=tiers — one player per tier
+// (Bronze → Predator) plus a placement player, so all row styling can
+// be inspected even when the real leaderboard only has Silver players.
+function buildPreviewRows(tab: Tab): Profile[] {
+  const samples: Array<{ id: string; name: string; rating: number; games: number }> = [
+    { id: 'preview-predator', name: '[Preview] Predator', rating: 1780, games: 80 },
+    { id: 'preview-diamond',  name: '[Preview] Diamond', rating: 1500, games: 50 },
+    { id: 'preview-gold',     name: '[Preview] Gold',    rating: 1325, games: 30 },
+    { id: 'preview-silver',   name: '[Preview] Silver',  rating: 1175, games: 18 },
+    { id: 'preview-bronze',   name: '[Preview] Bronze',  rating: 1040, games: 12 },
+    { id: 'preview-placement',name: '[Preview] Newbie',  rating: 1000, games: 2 },
+  ];
+  const isSingles = tab === 'singles';
+  return samples.map((s) => ({
+    id: s.id,
+    display_name: s.name,
+    avatar_url: null,
+    singles_rating: isSingles ? s.rating : 1000,
+    doubles_rating: isSingles ? 1000 : s.rating,
+    singles_games_played: isSingles ? s.games : 0,
+    doubles_games_played: isSingles ? 0 : s.games,
+    created_at: new Date().toISOString(),
+    chat_last_seen_at: new Date().toISOString(),
+  }));
 }
 
 // Tiered players come first (sorted by rating desc — already done by SQL),
