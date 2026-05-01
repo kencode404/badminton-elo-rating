@@ -119,8 +119,8 @@ export function HomePage() {
 function SystemAnnouncement({ a }: { a: AnnouncementRow }) {
   const challenge = a.streak_count >= 3;
   const message = challenge
-    ? `${a.display_name} is on a ${a.streak_count}-match ${a.match_type} streak 🔥 who's gonna take them down?`
-    : `${a.display_name} just hit a 2-match ${a.match_type} streak. Nice 🔥`;
+    ? `${a.display_name} won ${a.streak_count} ${a.match_type} matches in a row 🔥 Who can beat them?`
+    : `${a.display_name} won 2 ${a.match_type} matches in a row 🔥`;
   const accent = challenge
     ? 'text-orange-500 dark:text-orange-400'
     : 'text-amber-500 dark:text-amber-400';
