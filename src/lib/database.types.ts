@@ -5,6 +5,7 @@ export type MatchType = 'singles' | 'doubles';
 export type MatchStatus = 'pending' | 'confirmed' | 'rejected' | 'expired';
 export type Team = 'A' | 'B';
 export type Confirmation = 'pending' | 'accepted' | 'rejected';
+export type ChatMessageKind = 'system_streak' | 'user';
 
 export interface Database {
   public: {
@@ -76,26 +77,30 @@ export interface Database {
         };
         Relationships: [];
       };
-      streak_announcements: {
+      chat_messages: {
         Row: {
           id: string;
+          kind: ChatMessageKind;
           user_id: string;
-          match_type: MatchType;
-          streak_count: number;
+          body: string | null;
+          match_type: MatchType | null;
+          streak_count: number | null;
           created_at: string;
-          expires_at: string;
+          expires_at: string | null;
         };
         Insert: {
           id?: string;
+          kind: ChatMessageKind;
           user_id: string;
-          match_type: MatchType;
-          streak_count: number;
+          body?: string | null;
+          match_type?: MatchType | null;
+          streak_count?: number | null;
           created_at?: string;
-          expires_at?: string;
+          expires_at?: string | null;
         };
         Update: {
-          streak_count?: number;
-          expires_at?: string;
+          body?: string | null;
+          expires_at?: string | null;
         };
         Relationships: [];
       };
@@ -163,6 +168,7 @@ export interface Database {
       match_status: MatchStatus;
       match_team: Team;
       confirmation_status: Confirmation;
+      chat_message_kind: ChatMessageKind;
     };
     CompositeTypes: Record<string, never>;
   };

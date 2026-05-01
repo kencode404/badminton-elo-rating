@@ -26,9 +26,10 @@ export function HomePage() {
   useEffect(() => {
     let active = true;
     supabase
-      .from('streak_announcements')
+      .from('chat_messages')
       .select('id, user_id, match_type, streak_count, created_at, profiles:user_id(display_name, avatar_url)')
-      .gt('expires_at', new Date().toISOString())
+      .eq('kind', 'system_streak')
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
       .order('streak_count', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(20)
