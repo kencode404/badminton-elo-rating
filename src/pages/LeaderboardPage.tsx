@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { formatError } from '../lib/errors';
 import { ProfileDetailModal } from '../components/ProfileDetailModal';
 import { TierBadge } from '../components/TierBadge';
-import { ratingStatus, PLACEMENT_GAMES } from '../lib/tiers';
+import { ratingStatus, PLACEMENT_GAMES, TIERS, type RatingStatus } from '../lib/tiers';
 import type { Database } from '../lib/database.types';
 
 type Tab = 'singles' | 'doubles';
@@ -217,21 +217,14 @@ function Row({
           )}
           {isMe && <span className="text-[9px] tracking-widest ml-1">· you</span>}
         </div>
-        <div className="flex items-center gap-2 mt-0.5">
-          <TierBadge status={status} size={18} showName />
-          <span className="text-[10px] text-zinc-500 dark:text-zinc-500 tracking-wider uppercase">
-            · {games} {games === 1 ? 'game' : 'games'}
-          </span>
+        <div className="text-[10px] text-zinc-500 dark:text-zinc-500 tracking-wider uppercase mt-0.5">
+          {games} {games === 1 ? 'game' : 'games'}
         </div>
       </div>
 
-        <div className="text-right shrink-0">
-          <div className="font-display text-lg leading-none text-zinc-900 dark:text-zinc-100">
-            {rating}
-          </div>
-          <div className="text-[9px] text-zinc-500 dark:text-zinc-500 tracking-widest uppercase mt-0.5">
-            Rating
-          </div>
+        <div className="shrink-0 w-[88px] flex flex-col items-end gap-1">
+          <TierBadge status={status} size={20} showName />
+          <TierProgress status={status} rating={rating} />
         </div>
       </button>
     </li>
@@ -313,6 +306,51 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// Thin progress bar showing how far the player is through their current
+// tier (or placement window). Replaces the raw rating number on the row
+// so the leaderboard reads as "progression toward the next badge"
+// rather than a numeric ranking.
+function TierProgress({ status, rating }: { status: RatingStatus; rating: number }) {
+  if (status.kind === 'placement') {
+    const pct = (status.gamesPlayed / status.gamesNeeded) * 100;
+    return <ProgressBar pct={pct} />;
+  }
+  const tier = status.tier;
+  const next = TIERS.find((t) => t.minRating > tier.minRating);
+  if (!next) {
+    // Champion / max tier — full bar in champion gradient.
+    return (
+      <div className="w-full h-1 rounded-full overflow-hidden">
+        <div
+          className="h-full w-full"
+          style={{
+            background: 'linear-gradient(90deg, #f97316, #a855f7)',
+            boxShadow: '0 0 6px rgba(168, 85, 247, 0.55)',
+          }}
+        />
+      </div>
+    );
+  }
+  const span = next.minRating - tier.minRating;
+  const pct = Math.min(100, Math.max(0, ((rating - tier.minRating) / span) * 100));
+  return <ProgressBar pct={pct} />;
+}
+
+function ProgressBar({ pct }: { pct: number }) {
+  return (
+    <div className="w-full h-1 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+      <div
+        className="h-full rounded-full"
+        style={{
+          width: `${pct}%`,
+          background: 'linear-gradient(90deg, #38bdf8, #0ea5e9)',
+          boxShadow: '0 0 6px rgba(56, 189, 248, 0.55)',
+        }}
+      />
     </div>
   );
 }
