@@ -41,6 +41,12 @@ export function ProfilePage() {
   };
   const [snapshots, setSnapshots] = useState<SnapshotRow[] | null>(null);
   const [resetting, setResetting] = useState(false);
+  // Type-to-confirm guard: the reset button is initially disabled and
+  // only fires once the admin has explicitly typed RESET_PHRASE into
+  // the inline confirmation input.
+  const RESET_PHRASE = 'RESET SEASON';
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
 
   // ?preview=tiers also seeds three mock past-season snapshots so the
   // new Past Seasons Record layout can be inspected before any reset
@@ -133,10 +139,7 @@ export function ProfilePage() {
 
   async function resetSeason() {
     if (!user || !profile?.is_admin) return;
-    const ok = window.confirm(
-      'Reset the season?\n\nEvery player\'s ratings, games, and streaks will be archived as a past-season snapshot, then reset to 1000 and 0 games. This cannot be undone.',
-    );
-    if (!ok) return;
+    if (resetConfirmText.trim().toUpperCase() !== RESET_PHRASE) return;
     setResetting(true);
     setError(null);
     const { error } = await supabase.rpc('reset_season');
@@ -145,6 +148,8 @@ export function ProfilePage() {
       setError(error.message);
       return;
     }
+    setResetConfirmOpen(false);
+    setResetConfirmText('');
     // Refresh local state — pull profile + snapshots again
     const [{ data: p }, { data: snaps }] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
@@ -405,15 +410,61 @@ export function ProfilePage() {
             Archives every player's current ratings into a past-season
             snapshot, then resets the whole club to 1000 with 0 games.
             Stale streak/tier-up announcements in chat are cleared.
+            <strong className="text-red-500 dark:text-red-400"> This cannot be undone.</strong>
           </p>
-          <button
-            type="button"
-            onClick={resetSeason}
-            disabled={resetting}
-            className="w-full rounded-lg border border-red-400/60 dark:border-red-500/40 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-display tracking-widest uppercase text-xs py-2 transition disabled:opacity-50"
-          >
-            {resetting ? 'Resetting…' : 'Reset Season'}
-          </button>
+
+          {!resetConfirmOpen ? (
+            <button
+              type="button"
+              onClick={() => setResetConfirmOpen(true)}
+              className="w-full rounded-lg border border-red-400/60 dark:border-red-500/40 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-display tracking-widest uppercase text-xs py-2 transition"
+            >
+              Reset Season…
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <label
+                htmlFor="reset-confirm"
+                className="text-[10px] font-display tracking-widest uppercase text-zinc-600 dark:text-zinc-400 block"
+              >
+                Type <span className="text-red-500 dark:text-red-400">{RESET_PHRASE}</span> to confirm:
+              </label>
+              <input
+                id="reset-confirm"
+                autoFocus
+                value={resetConfirmText}
+                onChange={(e) => setResetConfirmText(e.target.value)}
+                disabled={resetting}
+                spellCheck={false}
+                autoComplete="off"
+                className="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400/40 disabled:opacity-50"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetConfirmOpen(false);
+                    setResetConfirmText('');
+                  }}
+                  disabled={resetting}
+                  className="flex-1 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-display tracking-widest uppercase text-xs py-2 transition disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={resetSeason}
+                  disabled={
+                    resetting ||
+                    resetConfirmText.trim().toUpperCase() !== RESET_PHRASE
+                  }
+                  className="flex-1 rounded-lg border border-red-400/60 dark:border-red-500/40 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-display tracking-widest uppercase text-xs py-2 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  {resetting ? 'Resetting…' : 'Confirm Reset'}
+                </button>
+              </div>
+            </div>
+          )}
         </section>
       )}
 
