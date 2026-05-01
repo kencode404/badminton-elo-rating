@@ -233,7 +233,7 @@ function Row({
 
       <div className="flex-1 min-w-0">
         <div
-          className={`text-sm truncate flex items-center gap-1 ${
+          className={`text-xs sm:text-sm truncate flex items-center gap-1 ${
             isMe
               ? 'font-display tracking-wide uppercase text-cyan2-600 dark:text-cyan2-300'
               : 'text-zinc-900 dark:text-zinc-100'
@@ -265,7 +265,16 @@ function Row({
       </div>
 
         <div className="shrink-0 w-[72px] flex flex-col items-center gap-1.5 self-start">
-          <TierBadge status={status} size={tierBadgeSize(status)} showName />
+          <TierBadge
+            status={status}
+            size={tierBadgeSize(status)}
+            showName
+            className={
+              status.kind === 'placement'
+                ? 'scale-[0.7] sm:scale-[0.85] origin-center'
+                : ''
+            }
+          />
           <TierProgress status={status} rating={rating} />
         </div>
       </button>

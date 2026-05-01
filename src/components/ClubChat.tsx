@@ -7,6 +7,7 @@ import {
   type FormEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { markChatSeen } from '../lib/chat';
@@ -68,11 +69,29 @@ interface Reaction {
 
 export function ClubChat() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const previewMode = searchParams.get('preview') === 'announcements';
   const [messages, setMessages] = useState<ChatMsg[] | null>(null);
   const [reactions, setReactions] = useState<Reaction[]>([]);
   // Display-name lookup for users referenced in breaker_user_ids on
   // streak-ended messages. Populated lazily as messages load.
   const [breakerNames, setBreakerNames] = useState<Record<string, string>>({});
+
+  // ?preview=announcements: prepend a set of fake system messages
+  // covering every tier-up + streak-broken variant so the styling
+  // can be inspected without waiting for real matches.
+  const displayedMessages = useMemo(() => {
+    if (!messages) return null;
+    if (!previewMode) return messages;
+    return [...buildPreviewAnnouncements(), ...messages];
+  }, [messages, previewMode]);
+  const previewBreakerNames: Record<string, string> = previewMode
+    ? {
+        'preview-breaker-1': 'Carol',
+        'preview-breaker-2': 'Dave',
+      }
+    : {};
+  const effectiveBreakerNames = { ...breakerNames, ...previewBreakerNames };
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -404,23 +423,28 @@ export function ClubChat() {
         className="px-3 py-3 space-y-2 overflow-y-auto"
         style={{ maxHeight: '22rem' }}
       >
-        {messages === null ? (
+        {previewMode && (
+          <div className="text-[10px] font-display tracking-widest uppercase text-cyan2-500 dark:text-cyan2-300 bg-cyan2-500/5 border border-cyan2-400/30 rounded-md px-3 py-2 mb-1">
+            Preview · mock announcements prepended
+          </div>
+        )}
+        {displayedMessages === null ? (
           <p className="text-center text-[11px] text-zinc-500 dark:text-zinc-500 py-6">
             Loading…
           </p>
-        ) : messages.length === 0 ? (
+        ) : displayedMessages.length === 0 ? (
           <p className="text-center text-[11px] text-zinc-500 dark:text-zinc-500 py-6">
             No messages yet — say hi 👋
           </p>
         ) : (
-          messages.map((m) => (
+          displayedMessages.map((m) => (
             <MessageRow
               key={m.id}
               msg={m}
               isMine={m.user_id === user?.id}
               reactions={reactionsByMessage.get(m.id) ?? new Map()}
               currentUserId={user?.id ?? null}
-              breakerNames={breakerNames}
+              breakerNames={effectiveBreakerNames}
               pickerOpen={pickerForMsg === m.id}
               reactorsOpen={reactorsForMsg === m.id}
               onTogglePicker={() => {
@@ -703,6 +727,109 @@ function SystemStreakEndedRow({
 
 // Maps a tier key to its accent RGB triple, used inline in tier-up
 // bubble styling (rgba()-friendly).
+// Mock announcements rendered when ?preview=announcements is set on
+// the home page. Covers every visual variant of the new system
+// messages so styling can be reviewed without waiting for real
+// matches to fire the trigger.
+function buildPreviewAnnouncements(): ChatMsg[] {
+  const now = Date.now();
+  const ago = (mins: number) =>
+    new Date(now - mins * 60_000).toISOString();
+  return [
+    {
+      id: 'preview-tier-bronze',
+      kind: 'system_tier_up',
+      user_id: 'preview-user-1',
+      body: null,
+      match_type: 'singles',
+      streak_count: null,
+      tier_key: 'bronze',
+      breaker_user_ids: null,
+      created_at: ago(2),
+      display_name: 'Alice',
+      avatar_url: null,
+    },
+    {
+      id: 'preview-tier-silver',
+      kind: 'system_tier_up',
+      user_id: 'preview-user-2',
+      body: null,
+      match_type: 'doubles',
+      streak_count: null,
+      tier_key: 'silver',
+      breaker_user_ids: null,
+      created_at: ago(3),
+      display_name: 'Bob',
+      avatar_url: null,
+    },
+    {
+      id: 'preview-tier-gold',
+      kind: 'system_tier_up',
+      user_id: 'preview-user-3',
+      body: null,
+      match_type: 'singles',
+      streak_count: null,
+      tier_key: 'gold',
+      breaker_user_ids: null,
+      created_at: ago(5),
+      display_name: 'Carol',
+      avatar_url: null,
+    },
+    {
+      id: 'preview-tier-diamond',
+      kind: 'system_tier_up',
+      user_id: 'preview-user-4',
+      body: null,
+      match_type: 'doubles',
+      streak_count: null,
+      tier_key: 'diamond',
+      breaker_user_ids: null,
+      created_at: ago(8),
+      display_name: 'Dave',
+      avatar_url: null,
+    },
+    {
+      id: 'preview-tier-predator',
+      kind: 'system_tier_up',
+      user_id: 'preview-user-5',
+      body: null,
+      match_type: 'doubles',
+      streak_count: null,
+      tier_key: 'predator',
+      breaker_user_ids: null,
+      created_at: ago(12),
+      display_name: 'Erin',
+      avatar_url: null,
+    },
+    {
+      id: 'preview-streak-singles',
+      kind: 'system_streak_ended',
+      user_id: 'preview-user-6',
+      body: null,
+      match_type: 'singles',
+      streak_count: 4,
+      tier_key: null,
+      breaker_user_ids: ['preview-breaker-1'],
+      created_at: ago(20),
+      display_name: 'Frank',
+      avatar_url: null,
+    },
+    {
+      id: 'preview-streak-doubles',
+      kind: 'system_streak_ended',
+      user_id: 'preview-user-7',
+      body: null,
+      match_type: 'doubles',
+      streak_count: 6,
+      tier_key: null,
+      breaker_user_ids: ['preview-breaker-1', 'preview-breaker-2'],
+      created_at: ago(30),
+      display_name: 'Gina',
+      avatar_url: null,
+    },
+  ];
+}
+
 function tierKeyToAccentRgb(key: TierKey): string {
   switch (key) {
     case 'bronze':   return '180, 95, 39';
