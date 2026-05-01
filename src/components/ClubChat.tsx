@@ -362,15 +362,17 @@ function SystemStreakRow({
   const accent = challenge
     ? 'text-orange-500 dark:text-orange-400'
     : 'text-amber-500 dark:text-amber-400';
+  const bubbleRef = useRef<HTMLDivElement>(null);
   const longPress = useLongPress(onTogglePicker);
 
   return (
     <div className="flex justify-start">
-      <div className="relative max-w-[88%] flex flex-col items-start gap-1">
+      <div className="max-w-[88%] flex flex-col items-start gap-1">
         <div className={`text-[9px] font-display uppercase tracking-widest ${accent}`}>
           System · {formatRelative(msg.created_at)}
         </div>
         <div
+          ref={bubbleRef}
           {...longPress}
           className={`rounded-2xl rounded-bl-md px-3 py-1.5 text-[12px] leading-snug select-none cursor-pointer ${
             challenge
@@ -381,7 +383,7 @@ function SystemStreakRow({
           {text}
         </div>
         {pickerOpen && (
-          <ReactionPicker alignRight={false} onPick={onToggleReaction} />
+          <ReactionPicker anchorRef={bubbleRef} alignRight={false} onPick={onToggleReaction} />
         )}
         <ReactionsBar
           reactions={reactions}
@@ -417,11 +419,12 @@ function UserMessageRow({
   const headerColor = isMine
     ? 'text-cyan2-600 dark:text-cyan2-300'
     : 'text-zinc-600 dark:text-zinc-400';
+  const bubbleRef = useRef<HTMLDivElement>(null);
   const longPress = useLongPress(onTogglePicker);
 
   return (
     <div className={`flex ${align}`}>
-      <div className={`relative max-w-[80%] flex flex-col ${isMine ? 'items-end' : 'items-start'} gap-1`}>
+      <div className={`max-w-[80%] flex flex-col ${isMine ? 'items-end' : 'items-start'} gap-1`}>
         <div className={`text-[9px] font-display tracking-widest ${headerColor}`}>
           {!isMine && <span className="uppercase">{msg.display_name} · </span>}
           <span className="text-zinc-500 dark:text-zinc-500">
@@ -429,13 +432,14 @@ function UserMessageRow({
           </span>
         </div>
         <div
+          ref={bubbleRef}
           {...longPress}
           className={`px-3 py-1.5 text-[13px] leading-snug select-none cursor-pointer ${bubbleClass}`}
         >
           {msg.body}
         </div>
         {pickerOpen && (
-          <ReactionPicker alignRight={isMine} onPick={onToggleReaction} />
+          <ReactionPicker anchorRef={bubbleRef} alignRight={isMine} onPick={onToggleReaction} />
         )}
         <ReactionsBar
           reactions={reactions}
@@ -488,20 +492,63 @@ function ReactionsBar({
   );
 }
 
-// Floating emoji palette shown above the message bubble after a long-press.
+// Floating emoji palette shown after long-press. Uses position:fixed
+// + computed coordinates anchored to the bubble so it isn't clipped
+// by the chat panel's overflow boundary. Flips above/below depending
+// on which side has more room.
 function ReactionPicker({
+  anchorRef,
   alignRight,
   onPick,
 }: {
+  anchorRef: React.RefObject<HTMLElement | null>;
   alignRight: boolean;
   onPick: (emoji: string) => void;
 }) {
+  const PICKER_HEIGHT = 48;
+  const PICKER_WIDTH_EST = 240;
+  const PADDING = 8;
+
+  const computePos = useCallback(() => {
+    const el = anchorRef.current;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    const above = r.top - PICKER_HEIGHT - PADDING;
+    const below = r.bottom + PADDING;
+    const top = above >= PADDING ? above : below;
+    const left = alignRight
+      ? Math.max(PADDING, r.right - PICKER_WIDTH_EST)
+      : Math.min(window.innerWidth - PICKER_WIDTH_EST - PADDING, Math.max(PADDING, r.left));
+    return { top, left };
+  }, [anchorRef, alignRight]);
+
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(computePos);
+
+  useEffect(() => {
+    setPos(computePos());
+    function update() {
+      setPos(computePos());
+    }
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [computePos]);
+
+  if (!pos) return null;
+
   return (
     <div
       data-reaction-picker
-      className={`absolute bottom-full mb-1 ${
-        alignRight ? 'right-0' : 'left-0'
-      } z-30 flex gap-1 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-lg p-1`}
+      style={{
+        position: 'fixed',
+        top: pos.top,
+        left: pos.left,
+        zIndex: 60,
+      }}
+      className="flex gap-1 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-lg p-1"
     >
       {REACTION_PALETTE.map((e) => (
         <button
