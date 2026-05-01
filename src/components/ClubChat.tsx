@@ -388,7 +388,7 @@ function SystemStreakRow({
         <ReactionsBar
           reactions={reactions}
           currentUserId={currentUserId}
-          onToggleReaction={onToggleReaction}
+          onTogglePicker={onTogglePicker}
         />
       </div>
     </div>
@@ -444,7 +444,7 @@ function UserMessageRow({
         <ReactionsBar
           reactions={reactions}
           currentUserId={currentUserId}
-          onToggleReaction={onToggleReaction}
+          onTogglePicker={onTogglePicker}
           alignRight={isMine}
         />
       </div>
@@ -452,42 +452,57 @@ function UserMessageRow({
   );
 }
 
+// Single pill grouping all unique emojis on a message + total count,
+// WhatsApp style. Overlaps the bubble's bottom edge slightly. Tap
+// opens the reaction picker so the user can add / change / remove
+// their own reaction.
 function ReactionsBar({
   reactions,
   currentUserId,
-  onToggleReaction,
+  onTogglePicker,
   alignRight = false,
 }: {
   reactions: Map<string, Reaction[]>;
   currentUserId: string | null;
-  onToggleReaction: (emoji: string) => void;
+  onTogglePicker: () => void;
   alignRight?: boolean;
 }) {
   const entries = Array.from(reactions.entries());
   if (entries.length === 0) return null;
+
+  const total = entries.reduce((sum, [, list]) => sum + list.length, 0);
+  const myReaction = currentUserId
+    ? Array.from(reactions.values())
+        .flat()
+        .find((r) => r.user_id === currentUserId)
+    : null;
+
   return (
-    <div className={`flex flex-wrap gap-1 items-center ${alignRight ? 'justify-end' : ''}`}>
-      {entries.map(([emoji, list]) => {
-        const mine = currentUserId
-          ? list.some((r) => r.user_id === currentUserId)
-          : false;
-        return (
-          <button
-            key={emoji}
-            type="button"
-            onClick={() => onToggleReaction(emoji)}
-            className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] border transition ${
-              mine
-                ? 'bg-cyan2-500/20 border-cyan2-400/60 text-cyan2-700 dark:text-cyan2-200'
-                : 'bg-zinc-100 dark:bg-zinc-800/60 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-cyan2-400/40'
-            }`}
-            title={`${list.length} ${list.length === 1 ? 'reaction' : 'reactions'}`}
-          >
-            <span className="text-[12px] leading-none">{emoji}</span>
-            <span className="text-[10px] leading-none">{list.length}</span>
-          </button>
-        );
-      })}
+    <div
+      className={`relative -mt-3 z-10 ${alignRight ? 'self-end mr-2' : 'self-start ml-2'}`}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        onClick={onTogglePicker}
+        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 border shadow-sm transition ${
+          myReaction
+            ? 'bg-cyan2-500/15 border-cyan2-400/60'
+            : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:border-cyan2-400/40'
+        }`}
+        aria-label={`${total} ${total === 1 ? 'reaction' : 'reactions'}`}
+      >
+        <span className="flex items-center gap-0.5">
+          {entries.map(([emoji]) => (
+            <span key={emoji} className="text-[13px] leading-none">
+              {emoji}
+            </span>
+          ))}
+        </span>
+        <span className="text-[11px] leading-none text-zinc-700 dark:text-zinc-300 font-display tracking-wider">
+          {total}
+        </span>
+      </button>
     </div>
   );
 }
