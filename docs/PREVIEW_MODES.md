@@ -98,6 +98,17 @@ so the bar shows roughly 50% progress.
 Real *Current Season* card stays visible above the preview block —
 nothing is overwritten.
 
+The same query param also seeds three mock **Past Seasons Record**
+snapshots above any real ones, so that section's tier-tinted cards
+can be inspected before the first real `reset_season()` has run.
+Past-season cards display final rank (not raw rating):
+
+| Season | Doubles outcome           | Singles outcome           |
+| ------ | ------------------------- | ------------------------- |
+| S3     | #1 · Diamond · 19W · 68%  | #4 · Gold · 14W · 64%     |
+| S2     | #5 · Gold · 14W · 58%     | #9 · Silver · 9W · 50%    |
+| S1     | #12 · Silver · 7W · 44%   | #17 · Bronze · 5W · 42%   |
+
 ---
 
 ## Adding a new preview mode

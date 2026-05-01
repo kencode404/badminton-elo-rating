@@ -25,6 +25,7 @@ export interface Database {
           doubles_games_played: number;
           created_at: string;
           chat_last_seen_at: string;
+          is_admin: boolean;
         };
         Insert: {
           id: string;
@@ -35,6 +36,7 @@ export interface Database {
           singles_games_played?: number;
           doubles_games_played?: number;
           chat_last_seen_at?: string;
+          is_admin?: boolean;
         };
         Update: {
           display_name?: string;
@@ -44,7 +46,38 @@ export interface Database {
           singles_games_played?: number;
           doubles_games_played?: number;
           chat_last_seen_at?: string;
+          is_admin?: boolean;
         };
+        Relationships: [];
+      };
+      season_snapshots: {
+        Row: {
+          user_id: string;
+          season_number: number;
+          archived_at: string;
+          singles_rating: number;
+          doubles_rating: number;
+          singles_games_played: number;
+          doubles_games_played: number;
+          singles_wins: number;
+          doubles_wins: number;
+          singles_rank: number | null;
+          doubles_rank: number | null;
+        };
+        Insert: {
+          user_id: string;
+          season_number: number;
+          singles_rating: number;
+          doubles_rating: number;
+          singles_games_played: number;
+          doubles_games_played: number;
+          singles_wins: number;
+          doubles_wins: number;
+          singles_rank?: number | null;
+          doubles_rank?: number | null;
+          archived_at?: string;
+        };
+        Update: never;
         Relationships: [];
       };
       matches: {
@@ -173,6 +206,10 @@ export interface Database {
           rating_delta: number | null;
           others: Array<{ user_id: string; display_name: string; team: Team }>;
         }[];
+      };
+      reset_season: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
       };
       get_win_streaks: {
         Args: Record<PropertyKey, never>;

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { formatError } from '../lib/errors';
 import { TierBadge } from './TierBadge';
 import { ratingStatus } from '../lib/tiers';
+import { PastSeasonRow, type PastSeasonSnapshot } from './PastSeasonRow';
 import type { Database, MatchType, Team } from '../lib/database.types';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -33,6 +34,8 @@ export function ProfileDetailModal({ userId, onClose }: Props) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [winCounts, setWinCounts] = useState<{ singles: number; doubles: number } | null>(null);
   const [matches, setMatches] = useState<RecentMatch[] | null>(null);
+  const [snapshots, setSnapshots] = useState<PastSeasonSnapshot[] | null>(null);
+  const [historyTab, setHistoryTab] = useState<'matches' | 'seasons'>('matches');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -75,6 +78,19 @@ export function ProfileDetailModal({ userId, onClose }: Props) {
           return;
         }
         setMatches((data ?? []) as RecentMatch[]);
+      });
+
+    supabase
+      .from('season_snapshots')
+      .select(
+        'season_number, archived_at, singles_rating, doubles_rating, singles_games_played, doubles_games_played, singles_wins, doubles_wins, singles_rank, doubles_rank',
+      )
+      .eq('user_id', userId)
+      .order('season_number', { ascending: false })
+      .limit(5)
+      .then(({ data }) => {
+        if (!active) return;
+        setSnapshots((data ?? []) as PastSeasonSnapshot[]);
       });
 
     return () => {
@@ -160,19 +176,49 @@ export function ProfileDetailModal({ userId, onClose }: Props) {
           />
         </section>
 
-        {/* Recent matches — scrolls internally so the modal stays compact */}
+        {/* History — toggle between Last 5 Matches and Last 5 Seasons.
+            Scrolls internally so the modal stays compact. */}
         <section className="px-4 pb-4 pt-3 flex flex-col min-h-0 flex-1">
-          <div className="section-title mb-2 shrink-0">Last 5 Matches</div>
-          {matches === null ? (
+          <div className="flex items-center gap-1 mb-2 shrink-0 p-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60">
+            {(['matches', 'seasons'] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setHistoryTab(tab)}
+                className={`flex-1 py-1.5 rounded text-[10px] font-display tracking-widest uppercase transition ${
+                  historyTab === tab
+                    ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900'
+                    : 'text-zinc-500 dark:text-zinc-400'
+                }`}
+              >
+                {tab === 'matches' ? 'Last 5 Matches' : 'Last 5 Seasons'}
+              </button>
+            ))}
+          </div>
+          {historyTab === 'matches' ? (
+            matches === null ? (
+              <p className="text-xs text-zinc-500 dark:text-zinc-500">Loading…</p>
+            ) : matches.length === 0 ? (
+              <p className="text-xs text-zinc-500 dark:text-zinc-500">
+                No confirmed matches yet.
+              </p>
+            ) : (
+              <ul className="space-y-1.5 overflow-y-auto" style={{ maxHeight: '11rem' }}>
+                {matches.map((m) => (
+                  <RecentMatchRow key={m.match_id} match={m} />
+                ))}
+              </ul>
+            )
+          ) : snapshots === null ? (
             <p className="text-xs text-zinc-500 dark:text-zinc-500">Loading…</p>
-          ) : matches.length === 0 ? (
+          ) : snapshots.length === 0 ? (
             <p className="text-xs text-zinc-500 dark:text-zinc-500">
-              No confirmed matches yet.
+              No archived seasons yet.
             </p>
           ) : (
-            <ul className="space-y-1.5 overflow-y-auto" style={{ maxHeight: '11rem' }}>
-              {matches.map((m) => (
-                <RecentMatchRow key={m.match_id} match={m} />
+            <ul className="space-y-2 overflow-y-auto" style={{ maxHeight: '14rem' }}>
+              {snapshots.map((s) => (
+                <PastSeasonRow key={s.season_number} snapshot={s} />
               ))}
             </ul>
           )}
@@ -222,7 +268,7 @@ function ModeStat({
         {games} games
       </div>
       <div className="text-[10px] text-zinc-700 dark:text-zinc-300 mt-0.5 font-display tracking-wider">
-        {winRate !== null ? `${wins}W · ${winRate}%` : '—'}
+        {winRate !== null ? `${wins} wins · ${winRate}%` : '—'}
       </div>
     </div>
   );

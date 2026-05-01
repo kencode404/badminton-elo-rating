@@ -443,6 +443,7 @@ function buildPreviewRows(tab: Tab): Profile[] {
     doubles_games_played: isSingles ? 0 : s.games,
     created_at: new Date().toISOString(),
     chat_last_seen_at: new Date().toISOString(),
+    is_admin: false,
   }));
 }
 

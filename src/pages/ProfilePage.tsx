@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { TierBadge } from '../components/TierBadge';
 import { ratingStatus, TIERS } from '../lib/tiers';
+import { PastSeasonRow } from '../components/PastSeasonRow';
 import { supabase } from '../lib/supabase';
 import { AvatarCropModal } from '../components/AvatarCropModal';
 import type { Database } from '../lib/database.types';
@@ -25,6 +26,66 @@ export function ProfilePage() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  type SnapshotRow = {
+    season_number: number;
+    archived_at: string;
+    singles_rating: number;
+    doubles_rating: number;
+    singles_games_played: number;
+    doubles_games_played: number;
+    singles_wins: number;
+    doubles_wins: number;
+    singles_rank: number | null;
+    doubles_rank: number | null;
+  };
+  const [snapshots, setSnapshots] = useState<SnapshotRow[] | null>(null);
+  const [resetting, setResetting] = useState(false);
+
+  // ?preview=tiers also seeds three mock past-season snapshots so the
+  // new Past Seasons Record layout can be inspected before any reset
+  // has actually run.
+  const displayedSnapshots: SnapshotRow[] | null = previewMode
+    ? [
+        {
+          season_number: 3,
+          archived_at: new Date().toISOString(),
+          singles_rating: 1310,
+          doubles_rating: 1480,
+          singles_games_played: 22,
+          doubles_games_played: 28,
+          singles_wins: 14,
+          doubles_wins: 19,
+          singles_rank: 4,
+          doubles_rank: 1,
+        },
+        {
+          season_number: 2,
+          archived_at: new Date().toISOString(),
+          singles_rating: 1180,
+          doubles_rating: 1260,
+          singles_games_played: 18,
+          doubles_games_played: 24,
+          singles_wins: 9,
+          doubles_wins: 14,
+          singles_rank: 9,
+          doubles_rank: 5,
+        },
+        {
+          season_number: 1,
+          archived_at: new Date().toISOString(),
+          singles_rating: 1095,
+          doubles_rating: 1140,
+          singles_games_played: 12,
+          doubles_games_played: 16,
+          singles_wins: 5,
+          doubles_wins: 7,
+          singles_rank: 17,
+          doubles_rank: 12,
+        },
+        ...(snapshots ?? []),
+      ]
+    : snapshots;
 
   useEffect(() => {
     if (!user) return;
@@ -53,10 +114,52 @@ export function ProfilePage() {
           doubles: row?.doubles_wins ?? 0,
         });
       });
+    supabase
+      .from('season_snapshots')
+      .select(
+        'season_number, archived_at, singles_rating, doubles_rating, singles_games_played, doubles_games_played, singles_wins, doubles_wins, singles_rank, doubles_rank',
+      )
+      .eq('user_id', user.id)
+      .order('season_number', { ascending: false })
+      .limit(5)
+      .then(({ data }) => {
+        if (!active) return;
+        setSnapshots((data ?? []) as SnapshotRow[]);
+      });
     return () => {
       active = false;
     };
   }, [user]);
+
+  async function resetSeason() {
+    if (!user || !profile?.is_admin) return;
+    const ok = window.confirm(
+      'Reset the season?\n\nEvery player\'s ratings, games, and streaks will be archived as a past-season snapshot, then reset to 1000 and 0 games. This cannot be undone.',
+    );
+    if (!ok) return;
+    setResetting(true);
+    setError(null);
+    const { error } = await supabase.rpc('reset_season');
+    setResetting(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    // Refresh local state — pull profile + snapshots again
+    const [{ data: p }, { data: snaps }] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+      supabase
+        .from('season_snapshots')
+        .select(
+          'season_number, archived_at, singles_rating, doubles_rating, singles_games_played, doubles_games_played',
+        )
+        .eq('user_id', user.id)
+        .order('season_number', { ascending: false }),
+    ]);
+    if (p) setProfile(p);
+    setSnapshots((snaps ?? []) as SnapshotRow[]);
+    setWinCounts({ singles: 0, doubles: 0 });
+  }
 
   async function saveName() {
     if (!user || !profile) return;
@@ -278,10 +381,41 @@ export function ProfilePage() {
 
       <section className="glass-panel p-5">
         <div className="section-title mb-3">Past Seasons Record</div>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Past seasons' final ratings and stats will appear here.
-        </p>
+        {displayedSnapshots === null ? (
+          <p className="text-sm text-zinc-500 dark:text-zinc-500">Loading…</p>
+        ) : displayedSnapshots.length === 0 ? (
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            No archived seasons yet.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {displayedSnapshots.map((s) => (
+              <PastSeasonRow key={s.season_number} snapshot={s} />
+            ))}
+          </ul>
+        )}
       </section>
+
+      {profile?.is_admin && (
+        <section className="glass-panel p-5 border-red-400/40 dark:border-red-500/30">
+          <div className="section-title mb-2 text-red-500 dark:text-red-400">
+            Admin · Season Reset
+          </div>
+          <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-3">
+            Archives every player's current ratings into a past-season
+            snapshot, then resets the whole club to 1000 with 0 games.
+            Stale streak/tier-up announcements in chat are cleared.
+          </p>
+          <button
+            type="button"
+            onClick={resetSeason}
+            disabled={resetting}
+            className="w-full rounded-lg border border-red-400/60 dark:border-red-500/40 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-display tracking-widest uppercase text-xs py-2 transition disabled:opacity-50"
+          >
+            {resetting ? 'Resetting…' : 'Reset Season'}
+          </button>
+        </section>
+      )}
 
       <Link
         to="/scoring-guide"
@@ -370,8 +504,9 @@ function Stat({
         {games} games
       </div>
       <div className="text-[10px] text-zinc-700 dark:text-zinc-300 mt-0.5 font-display tracking-wider">
-        {winRate !== null ? `${wins}W · ${winRate}%` : '— no games'}
+        {winRate !== null ? `${wins} wins · ${winRate}%` : '— no games'}
       </div>
     </div>
   );
 }
+
