@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth';
 import { TierBadge } from '../components/TierBadge';
 import { ratingStatus, TIERS } from '../lib/tiers';
 import { PastSeasonRow } from '../components/PastSeasonRow';
+import { PeakTiers } from '../components/PeakTiers';
 import { supabase } from '../lib/supabase';
 import { AvatarCropModal } from '../components/AvatarCropModal';
 import type { Database } from '../lib/database.types';
@@ -322,6 +323,9 @@ export function ProfilePage() {
           </button>
         )}
         <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1">{user?.email}</p>
+        <div className="flex justify-center">
+          <PeakTiers profile={profile} snapshots={snapshots} size="sm" />
+        </div>
       </section>
 
       {error && (

@@ -4,6 +4,7 @@ import { formatError } from '../lib/errors';
 import { TierBadge } from './TierBadge';
 import { ratingStatus } from '../lib/tiers';
 import { PastSeasonRow, type PastSeasonSnapshot } from './PastSeasonRow';
+import { PeakTiers } from './PeakTiers';
 import type { Database, MatchType, Team } from '../lib/database.types';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -157,6 +158,7 @@ export function ProfileDetailModal({ userId, onClose }: Props) {
             <div className="text-[10px] text-zinc-500 dark:text-zinc-500 uppercase tracking-widest">
               Member since {profile?.created_at ? formatYearMonth(profile.created_at) : '—'}
             </div>
+            <PeakTiers profile={profile} snapshots={snapshots} size="xs" />
           </div>
         </section>
 
@@ -264,10 +266,7 @@ function ModeStat({
           <TierBadge status={status} size={18} showName />
         </div>
       )}
-      <div className="text-[10px] text-zinc-500 dark:text-zinc-500 mt-1 uppercase tracking-wider">
-        {games} games
-      </div>
-      <div className="text-[10px] text-zinc-700 dark:text-zinc-300 mt-0.5 font-display tracking-wider">
+      <div className="text-[10px] text-zinc-700 dark:text-zinc-300 mt-1 font-display tracking-wider">
         {winRate !== null ? `${wins} wins · ${winRate}% rate` : '—'}
       </div>
     </div>
