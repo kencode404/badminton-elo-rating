@@ -1,19 +1,23 @@
 -- Badminton ELO — consolidated schema (v2 ELO).
 -- Run this in the Supabase SQL editor for your project. Safe to rerun.
 --
--- This is the single source of truth for the base schema. Earlier
--- patch migrations have been folded back into this file plus the
--- four sibling files below; see git history for the change rationale.
--- To set up a fresh database, run in order:
+-- This is the single source of truth for the base schema. To set up
+-- a fresh database, run the migration files in numeric order:
 --   1) 0001_init.sql       — this file: base schema, ELO settlement,
---                            RLS policies, expiry cron stub
+--                            RLS policies, expiry cron stub, seasons
 --   2) 0002_avatars.sql    — storage bucket for profile avatars + RLS
 --   3) 0003_user_stats.sql — leaderboard / profile RPCs (streaks,
---                            win counts, recent matches)
---   4) 0004_chat.sql       — chat_messages, chat_reactions, streak
---                            announcement trigger, chat_last_seen_at
+--                            win counts, recent matches), filtered to
+--                            the current season
+--   4) 0004_chat.sql       — chat_messages, chat_reactions, plus the
+--                            three system-announcement kinds (streak,
+--                            tier_up, streak_ended) emitted by the
+--                            after-match-confirmed trigger
 --   5) 0005_realtime.sql   — adds chat tables + profiles to the
 --                            supabase_realtime publication
+--   6) 0006_unsend_window.sql — chat unsend window tweak
+--   7) 0007_seasons.sql    — season_snapshots + reset_season RPC,
+--                            admin grant for the club admin
 --
 -- Constants (K-factor, starting rating, expiry days, margin tuning) are
 -- kept in sync with src/lib/elo.ts and docs/ELO_CALCULATION.md.
@@ -54,8 +58,13 @@ create table if not exists public.profiles (
   doubles_rating int not null default 1000,
   singles_games_played int not null default 0 check (singles_games_played >= 0),
   doubles_games_played int not null default 0 check (doubles_games_played >= 0),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  is_admin boolean not null default false
 );
+
+-- Idempotent column adds for existing prod that pre-dates the column.
+alter table public.profiles
+  add column if not exists is_admin boolean not null default false;
 
 create index if not exists profiles_singles_rating_idx on public.profiles (singles_rating desc);
 create index if not exists profiles_doubles_rating_idx on public.profiles (doubles_rating desc);
@@ -87,6 +96,30 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- =========================================================================
+-- 2b. Seasons (latest row's started_at is the current-season cutoff
+--     used by streak/win SQL helpers in 0003)
+-- =========================================================================
+
+create table if not exists public.seasons (
+  number int primary key,
+  started_at timestamptz not null default now()
+);
+
+-- Seed season 1 with a far-past start so every existing match counts
+-- as belonging to the current season. reset_season() (in 0007) inserts
+-- season 2, 3, … with started_at = now().
+insert into public.seasons (number, started_at)
+select 1, '1970-01-01'::timestamptz
+ where not exists (select 1 from public.seasons);
+
+alter table public.seasons enable row level security;
+
+drop policy if exists "Seasons readable by all" on public.seasons;
+create policy "Seasons readable by all"
+  on public.seasons for select
+  to authenticated using (true);
 
 -- =========================================================================
 -- 3. Matches & participants

@@ -1,0 +1,178 @@
+-- Season-reset infrastructure.
+--
+-- The `seasons` table itself lives in 0001 (foundational — referenced
+-- by streak/win helpers in 0003). This file adds:
+--
+--   * season_snapshots (one row per user per archived season): final
+--     rating, games, wins, and rank per mode
+--   * reset_season() RPC: admin-only — snapshots every profile, opens
+--     the next season, resets ratings to 1000 / games to 0, deletes
+--     stale system announcements, trims snapshots older than 5 seasons
+--   * one-shot grant making khieng96@gmail.com an admin
+--
+-- Safe to rerun. To grant another email later:
+--   update public.profiles
+--      set is_admin = true
+--    where id = (select id from auth.users where email = 'YOUR_EMAIL');
+
+-- =========================================================================
+-- 1. season_snapshots
+-- =========================================================================
+
+create table if not exists public.season_snapshots (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  season_number int not null references public.seasons(number) on delete cascade,
+  archived_at timestamptz not null default now(),
+  singles_rating int not null,
+  doubles_rating int not null,
+  singles_games_played int not null,
+  doubles_games_played int not null,
+  singles_wins int not null default 0,
+  doubles_wins int not null default 0,
+  -- Final rank within the closing season for each mode. Null if the
+  -- player didn't play any matches in that mode.
+  singles_rank int,
+  doubles_rank int,
+  primary key (user_id, season_number)
+);
+
+create index if not exists season_snapshots_user_idx
+  on public.season_snapshots (user_id, season_number desc);
+
+alter table public.season_snapshots enable row level security;
+
+drop policy if exists "Snapshots readable by all" on public.season_snapshots;
+create policy "Snapshots readable by all"
+  on public.season_snapshots for select
+  to authenticated using (true);
+
+-- No insert/update/delete policies — only the SECURITY DEFINER
+-- reset_season() function below writes here.
+
+-- =========================================================================
+-- 2. reset_season()
+-- =========================================================================
+
+create or replace function public.reset_season()
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_admin boolean;
+  v_current_season int;
+  v_next_season int;
+begin
+  -- Auth: caller must be an admin
+  select is_admin into v_admin
+    from public.profiles
+   where id = auth.uid();
+  if not coalesce(v_admin, false) then
+    raise exception 'Only admins can reset the season';
+  end if;
+
+  -- Current season is the row we're about to archive
+  select coalesce(max(number), 1) into v_current_season
+    from public.seasons;
+
+  v_next_season := v_current_season + 1;
+
+  -- Snapshot every profile into the season we're closing. Wins are
+  -- derived from match_participants for matches confirmed within the
+  -- current season window. Ranks are row_number() over the rating
+  -- column per mode, restricted to players who actually played that
+  -- mode (so non-players get null rank instead of being lumped at
+  -- the bottom).
+  with singles_ranked as (
+    select id,
+      row_number() over (
+        order by singles_rating desc, singles_games_played desc
+      )::int as rank
+      from public.profiles
+     where singles_games_played > 0
+  ),
+  doubles_ranked as (
+    select id,
+      row_number() over (
+        order by doubles_rating desc, doubles_games_played desc
+      )::int as rank
+      from public.profiles
+     where doubles_games_played > 0
+  )
+  insert into public.season_snapshots
+    (user_id, season_number, singles_rating, doubles_rating,
+     singles_games_played, doubles_games_played,
+     singles_wins, doubles_wins,
+     singles_rank, doubles_rank)
+  select
+    p.id,
+    v_current_season,
+    p.singles_rating,
+    p.doubles_rating,
+    p.singles_games_played,
+    p.doubles_games_played,
+    coalesce(sw.singles_wins, 0),
+    coalesce(sw.doubles_wins, 0),
+    sr.rank,
+    dr.rank
+  from public.profiles p
+  left join singles_ranked sr on sr.id = p.id
+  left join doubles_ranked dr on dr.id = p.id
+  left join lateral (
+    select
+      coalesce(sum(case
+        when m.match_type = 'singles'
+         and ((mp.team = 'A' and m.score_a > m.score_b)
+              or (mp.team = 'B' and m.score_b > m.score_a))
+        then 1 else 0 end), 0)::int as singles_wins,
+      coalesce(sum(case
+        when m.match_type = 'doubles'
+         and ((mp.team = 'A' and m.score_a > m.score_b)
+              or (mp.team = 'B' and m.score_b > m.score_a))
+        then 1 else 0 end), 0)::int as doubles_wins
+    from public.match_participants mp
+    join public.matches m on m.id = mp.match_id
+    where mp.user_id = p.id
+      and m.status = 'confirmed'
+      and m.played_at >= (
+        select started_at from public.seasons where number = v_current_season
+      )
+  ) sw on true;
+
+  -- Open the new season
+  insert into public.seasons (number, started_at)
+  values (v_next_season, now());
+
+  -- Reset every profile to fresh-start state
+  update public.profiles
+     set singles_rating = 1000,
+         doubles_rating = 1000,
+         singles_games_played = 0,
+         doubles_games_played = 0;
+
+  -- Clear stale system announcements (they reference last season's
+  -- streaks and tier crossings). User chat is preserved.
+  delete from public.chat_messages
+   where kind in ('system_streak', 'system_tier_up', 'system_streak_ended');
+
+  -- Keep only the five most recent past seasons. Older snapshots are
+  -- dropped so the Past Seasons Record list stays focused.
+  delete from public.season_snapshots
+   where season_number <= v_current_season - 5;
+
+  return v_next_season;
+end;
+$$;
+
+grant execute on function public.reset_season() to authenticated;
+
+-- =========================================================================
+-- 3. Grant admin to khieng96@gmail.com (idempotent)
+-- =========================================================================
+
+update public.profiles
+   set is_admin = true
+ where id in (
+   select id from auth.users where email = 'khieng96@gmail.com'
+ );

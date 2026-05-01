@@ -2,8 +2,11 @@
 -- profile-detail modal. All SECURITY DEFINER so they can read across
 -- match_participants without tripping its RLS.
 --
--- Folds together the original 0006_win_streaks.sql, 0007_user_stats.sql,
--- and the current_streak_for_user_mode helper from 0008.
+-- Every match-history query is filtered to the current season
+-- (seasons.started_at). Older matches still exist in the matches
+-- table (kept for the get_recent_matches modal feed below) but
+-- streak / win-count helpers ignore them after a reset_season().
+--
 -- Safe to rerun.
 
 -- =========================================================================
@@ -20,7 +23,12 @@ stable
 security definer
 set search_path = public
 as $$
-  with ordered as (
+  with season_start as (
+    select started_at from public.seasons
+     order by number desc
+     limit 1
+  ),
+  ordered as (
     select
       m.played_at,
       case
@@ -34,6 +42,7 @@ as $$
     where mp.user_id = p_user_id
       and m.match_type = p_match_type
       and m.status = 'confirmed'
+      and m.played_at >= (select started_at from season_start)
   ),
   with_loss as (
     select
@@ -45,7 +54,7 @@ as $$
     from ordered
   )
   select coalesce(count(*) filter (where is_win = 1 and losses_so_far = 0), 0)::int
-  from with_loss;
+    from with_loss;
 $$;
 
 grant execute on function public.current_streak_for_user_mode(uuid, match_type) to authenticated;
@@ -66,7 +75,10 @@ stable
 security definer
 set search_path = public
 as $$
-  with ordered as (
+  with season_start as (
+    select started_at from public.seasons order by number desc limit 1
+  ),
+  ordered as (
     select
       mp.user_id,
       m.match_type,
@@ -80,6 +92,7 @@ as $$
     from public.match_participants mp
     join public.matches m on m.id = mp.match_id
     where m.status = 'confirmed'
+      and m.played_at >= (select started_at from season_start)
   ),
   with_loss_count as (
     select
@@ -105,8 +118,8 @@ as $$
     user_id,
     coalesce(max(streak) filter (where match_type = 'singles'), 0)::int as singles_streak,
     coalesce(max(streak) filter (where match_type = 'doubles'), 0)::int as doubles_streak
-  from streaks_by_mode
-  group by user_id;
+    from streaks_by_mode
+   group by user_id;
 $$;
 
 grant execute on function public.get_win_streaks() to authenticated;
@@ -122,38 +135,39 @@ stable
 security definer
 set search_path = public
 as $$
+  with season_start as (
+    select started_at from public.seasons order by number desc limit 1
+  )
   select
     coalesce(
-      sum(
-        case
-          when (mp.team = 'A' and m.score_a > m.score_b)
-            or (mp.team = 'B' and m.score_b > m.score_a)
-          then 1
-          else 0
-        end
+      sum(case
+        when (mp.team = 'A' and m.score_a > m.score_b)
+          or (mp.team = 'B' and m.score_b > m.score_a)
+        then 1 else 0 end
       ) filter (where m.match_type = 'singles'),
       0
     )::int as singles_wins,
     coalesce(
-      sum(
-        case
-          when (mp.team = 'A' and m.score_a > m.score_b)
-            or (mp.team = 'B' and m.score_b > m.score_a)
-          then 1
-          else 0
-        end
+      sum(case
+        when (mp.team = 'A' and m.score_a > m.score_b)
+          or (mp.team = 'B' and m.score_b > m.score_a)
+        then 1 else 0 end
       ) filter (where m.match_type = 'doubles'),
       0
     )::int as doubles_wins
   from public.match_participants mp
   join public.matches m on m.id = mp.match_id
-  where mp.user_id = p_user_id and m.status = 'confirmed';
+  where mp.user_id = p_user_id
+    and m.status = 'confirmed'
+    and m.played_at >= (select started_at from season_start);
 $$;
 
 grant execute on function public.get_user_win_counts(uuid) to authenticated;
 
 -- =========================================================================
 -- 4. Recent confirmed matches for a user (profile detail modal)
+--    Not season-filtered — the modal's "Last 5 Matches" tab can span
+--    seasons; the past-season summary lives elsewhere.
 -- =========================================================================
 
 create or replace function public.get_recent_matches(
