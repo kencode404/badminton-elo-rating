@@ -20,7 +20,7 @@ export interface PendingMatchSummary {
 export async function searchPlayers(
   query: string,
   excludeIds: string[] = [],
-  limit = 8,
+  limit = 100,
 ): Promise<Pick<Profile, 'id' | 'display_name' | 'avatar_url'>[]> {
   let q = supabase
     .from('profiles')

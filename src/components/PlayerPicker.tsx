@@ -29,7 +29,7 @@ export function PlayerPicker({ label, max, selected, onChange, excludeIds = [] }
     setLoading(true);
     const t = setTimeout(async () => {
       try {
-        const data = await searchPlayers(query, exclude, 8);
+        const data = await searchPlayers(query, exclude, 100);
         if (active) setResults(data);
       } catch {
         if (active) setResults([]);
@@ -108,7 +108,7 @@ export function PlayerPicker({ label, max, selected, onChange, excludeIds = [] }
       />
 
       {open && !exhausted && (
-        <div className="absolute z-20 left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-lg">
+        <div className="absolute z-20 left-0 right-0 mt-1 max-h-80 overflow-y-auto overscroll-contain rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-lg">
           {loading ? (
             <div className="px-3 py-2 text-xs text-zinc-500 dark:text-zinc-500">Searching…</div>
           ) : results.length === 0 ? (
