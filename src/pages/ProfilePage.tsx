@@ -245,9 +245,9 @@ export function ProfilePage() {
       </section>
 
       <section className="glass-panel p-5">
-        <div className="section-title mb-3">Match History</div>
+        <div className="section-title mb-3">Past Seasons Record</div>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Past matches and rating changes will appear here.
+          Past seasons' final ratings and stats will appear here.
         </p>
       </section>
 
