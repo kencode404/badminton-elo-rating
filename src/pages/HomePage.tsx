@@ -30,9 +30,8 @@ export function HomePage() {
       .select('id, user_id, match_type, streak_count, created_at, profiles:user_id(display_name, avatar_url)')
       .eq('kind', 'system_streak')
       .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
-      .order('streak_count', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(20)
+      .limit(50)
       .then(({ data }) => {
         if (!active) return;
         type Joined = {
