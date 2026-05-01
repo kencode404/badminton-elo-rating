@@ -13,7 +13,7 @@ import { markChatSeen } from '../lib/chat';
 import { formatError } from '../lib/errors';
 import type { ChatMessageKind, MatchType } from '../lib/database.types';
 
-const REACTION_PALETTE = ['🔥', '👏', '😂', '❤️', '💪', '🤝'];
+const REACTION_PALETTE = ['🔥', '👏', '😂', '❤️', '💪', '🤝', '😠', '😢'];
 const LONG_PRESS_MS = 450;
 
 function useLongPress(callback: () => void) {
@@ -57,6 +57,8 @@ interface Reaction {
   message_id: string;
   user_id: string;
   emoji: string;
+  display_name: string;
+  avatar_url: string | null;
 }
 
 export function ClubChat() {
@@ -67,6 +69,7 @@ export function ClubChat() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pickerForMsg, setPickerForMsg] = useState<string | null>(null);
+  const [reactorsForMsg, setReactorsForMsg] = useState<string | null>(null);
 
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -114,13 +117,27 @@ export function ClubChat() {
     async function loadReactions() {
       const { data, error } = await supabase
         .from('chat_reactions')
-        .select('message_id, user_id, emoji');
+        .select('message_id, user_id, emoji, profiles:user_id(display_name, avatar_url)');
       if (!active) return;
       if (error) {
-        // Non-fatal; keep going without reactions
         return;
       }
-      setReactions((data ?? []) as Reaction[]);
+      type Joined = {
+        message_id: string;
+        user_id: string;
+        emoji: string;
+        profiles: { display_name: string; avatar_url: string | null } | null;
+      };
+      const flattened: Reaction[] = ((data ?? []) as unknown as Joined[]).map(
+        (r) => ({
+          message_id: r.message_id,
+          user_id: r.user_id,
+          emoji: r.emoji,
+          display_name: r.profiles?.display_name ?? 'Player',
+          avatar_url: r.profiles?.avatar_url ?? null,
+        }),
+      );
+      setReactions(flattened);
     }
 
     loadMessages();
@@ -167,16 +184,22 @@ export function ClubChat() {
     listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages]);
 
-  // Close the reaction picker on any outside tap or Escape.
+  // Close any open popover (picker or reactors) on outside tap or Escape.
   useEffect(() => {
-    if (!pickerForMsg) return;
+    if (!pickerForMsg && !reactorsForMsg) return;
     function maybeClose(e: PointerEvent) {
       const t = e.target as HTMLElement | null;
-      if (t && t.closest('[data-reaction-picker]')) return;
+      if (t && (t.closest('[data-reaction-picker]') || t.closest('[data-reactors-popover]'))) {
+        return;
+      }
       setPickerForMsg(null);
+      setReactorsForMsg(null);
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setPickerForMsg(null);
+      if (e.key === 'Escape') {
+        setPickerForMsg(null);
+        setReactorsForMsg(null);
+      }
     }
     document.addEventListener('pointerdown', maybeClose);
     document.addEventListener('keydown', onKey);
@@ -184,7 +207,7 @@ export function ClubChat() {
       document.removeEventListener('pointerdown', maybeClose);
       document.removeEventListener('keydown', onKey);
     };
-  }, [pickerForMsg]);
+  }, [pickerForMsg, reactorsForMsg]);
 
   // Mark chat seen on mount and whenever the message list updates while
   // the user is on this page.
@@ -294,7 +317,15 @@ export function ClubChat() {
               reactions={reactionsByMessage.get(m.id) ?? new Map()}
               currentUserId={user?.id ?? null}
               pickerOpen={pickerForMsg === m.id}
-              onTogglePicker={() => setPickerForMsg((id) => (id === m.id ? null : m.id))}
+              reactorsOpen={reactorsForMsg === m.id}
+              onTogglePicker={() => {
+                setReactorsForMsg(null);
+                setPickerForMsg((id) => (id === m.id ? null : m.id));
+              }}
+              onShowReactors={() => {
+                setPickerForMsg(null);
+                setReactorsForMsg((id) => (id === m.id ? null : m.id));
+              }}
               onToggleReaction={(emoji) => toggleReaction(m.id, emoji)}
             />
           ))
@@ -332,27 +363,23 @@ export function ClubChat() {
   );
 }
 
-function MessageRow({
-  msg,
-  isMine,
-  reactions,
-  currentUserId,
-  pickerOpen,
-  onTogglePicker,
-  onToggleReaction,
-}: {
+interface RowProps {
   msg: ChatMsg;
   isMine: boolean;
   reactions: Map<string, Reaction[]>;
   currentUserId: string | null;
   pickerOpen: boolean;
+  reactorsOpen: boolean;
   onTogglePicker: () => void;
+  onShowReactors: () => void;
   onToggleReaction: (emoji: string) => void;
-}) {
-  if (msg.kind === 'system_streak') {
-    return <SystemStreakRow msg={msg} reactions={reactions} currentUserId={currentUserId} pickerOpen={pickerOpen} onTogglePicker={onTogglePicker} onToggleReaction={onToggleReaction} />;
+}
+
+function MessageRow(props: RowProps) {
+  if (props.msg.kind === 'system_streak') {
+    return <SystemStreakRow {...props} />;
   }
-  return <UserMessageRow msg={msg} isMine={isMine} reactions={reactions} currentUserId={currentUserId} pickerOpen={pickerOpen} onTogglePicker={onTogglePicker} onToggleReaction={onToggleReaction} />;
+  return <UserMessageRow {...props} />;
 }
 
 function SystemStreakRow({
@@ -360,16 +387,11 @@ function SystemStreakRow({
   reactions,
   currentUserId,
   pickerOpen,
+  reactorsOpen,
   onTogglePicker,
+  onShowReactors,
   onToggleReaction,
-}: {
-  msg: ChatMsg;
-  reactions: Map<string, Reaction[]>;
-  currentUserId: string | null;
-  pickerOpen: boolean;
-  onTogglePicker: () => void;
-  onToggleReaction: (emoji: string) => void;
-}) {
+}: RowProps) {
   const challenge = (msg.streak_count ?? 0) >= 3;
   const text = challenge
     ? `${msg.display_name} won ${msg.streak_count} ${msg.match_type} matches in a row 🔥 Who can beat them?`
@@ -378,6 +400,7 @@ function SystemStreakRow({
     ? 'text-orange-500 dark:text-orange-400'
     : 'text-amber-500 dark:text-amber-400';
   const bubbleRef = useRef<HTMLDivElement>(null);
+  const pillRef = useRef<HTMLDivElement>(null);
   const longPress = useLongPress(onTogglePicker);
 
   return (
@@ -408,8 +431,16 @@ function SystemStreakRow({
         <ReactionsBar
           reactions={reactions}
           currentUserId={currentUserId}
-          onTogglePicker={onTogglePicker}
+          onShowReactors={onShowReactors}
+          barRef={pillRef}
         />
+        {reactorsOpen && (
+          <ReactorsPopover
+            anchorRef={pillRef}
+            alignRight={false}
+            reactions={reactions}
+          />
+        )}
       </div>
     </div>
   );
@@ -421,17 +452,11 @@ function UserMessageRow({
   reactions,
   currentUserId,
   pickerOpen,
+  reactorsOpen,
   onTogglePicker,
+  onShowReactors,
   onToggleReaction,
-}: {
-  msg: ChatMsg;
-  isMine: boolean;
-  reactions: Map<string, Reaction[]>;
-  currentUserId: string | null;
-  pickerOpen: boolean;
-  onTogglePicker: () => void;
-  onToggleReaction: (emoji: string) => void;
-}) {
+}: RowProps) {
   const align = isMine ? 'justify-end' : 'justify-start';
   const bubbleClass = isMine
     ? 'bg-cyan2-500/15 text-zinc-900 dark:text-zinc-100 rounded-2xl rounded-br-md'
@@ -440,6 +465,7 @@ function UserMessageRow({
     ? 'text-cyan2-600 dark:text-cyan2-300'
     : 'text-zinc-600 dark:text-zinc-400';
   const bubbleRef = useRef<HTMLDivElement>(null);
+  const pillRef = useRef<HTMLDivElement>(null);
   const longPress = useLongPress(onTogglePicker);
 
   return (
@@ -469,9 +495,17 @@ function UserMessageRow({
         <ReactionsBar
           reactions={reactions}
           currentUserId={currentUserId}
-          onTogglePicker={onTogglePicker}
+          onShowReactors={onShowReactors}
           alignRight={isMine}
+          barRef={pillRef}
         />
+        {reactorsOpen && (
+          <ReactorsPopover
+            anchorRef={pillRef}
+            alignRight={isMine}
+            reactions={reactions}
+          />
+        )}
       </div>
     </div>
   );
@@ -484,13 +518,15 @@ function UserMessageRow({
 function ReactionsBar({
   reactions,
   currentUserId,
-  onTogglePicker,
+  onShowReactors,
   alignRight = false,
+  barRef,
 }: {
   reactions: Map<string, Reaction[]>;
   currentUserId: string | null;
-  onTogglePicker: () => void;
+  onShowReactors: () => void;
   alignRight?: boolean;
+  barRef?: React.Ref<HTMLDivElement>;
 }) {
   const entries = Array.from(reactions.entries());
   if (entries.length === 0) return null;
@@ -504,18 +540,19 @@ function ReactionsBar({
 
   return (
     <div
+      ref={barRef}
       className={`relative -mt-3 z-10 ${alignRight ? 'self-end mr-2' : 'self-start ml-2'}`}
       onPointerDown={(e) => e.stopPropagation()}
     >
       <button
         type="button"
-        onClick={onTogglePicker}
+        onClick={onShowReactors}
         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 border shadow-sm transition ${
           myReaction
             ? 'bg-cyan2-500/15 border-cyan2-400/60'
             : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:border-cyan2-400/40'
         }`}
-        aria-label={`${total} ${total === 1 ? 'reaction' : 'reactions'}`}
+        aria-label={`${total} ${total === 1 ? 'reaction' : 'reactions'} — tap to see who reacted`}
       >
         <span className="flex items-center gap-0.5">
           {entries.map(([emoji]) => (
@@ -528,6 +565,100 @@ function ReactionsBar({
           {total}
         </span>
       </button>
+    </div>
+  );
+}
+
+// Compact popover listing each reactor + the emoji they used. Anchored
+// to the reactions pill, position:fixed (escapes chat panel overflow),
+// scrollable when the list is long, capped to fit phone widths.
+function ReactorsPopover({
+  anchorRef,
+  alignRight,
+  reactions,
+}: {
+  anchorRef: React.RefObject<HTMLElement | null>;
+  alignRight: boolean;
+  reactions: Map<string, Reaction[]>;
+}) {
+  const POPOVER_HEIGHT = 220; // approx, used for above/below decision
+  const POPOVER_WIDTH = 220;
+  const PADDING = 8;
+
+  const computePos = useCallback(() => {
+    const el = anchorRef.current;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    const above = r.top - POPOVER_HEIGHT - PADDING;
+    const below = r.bottom + PADDING;
+    const top = above >= PADDING ? above : below;
+    const left = alignRight
+      ? Math.max(PADDING, r.right - POPOVER_WIDTH)
+      : Math.min(window.innerWidth - POPOVER_WIDTH - PADDING, Math.max(PADDING, r.left));
+    return { top, left };
+  }, [anchorRef, alignRight]);
+
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(computePos);
+
+  useEffect(() => {
+    setPos(computePos());
+    function update() {
+      setPos(computePos());
+    }
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [computePos]);
+
+  // Flat list, grouped by emoji order. Each row: avatar, name, emoji.
+  const rows = Array.from(reactions.entries()).flatMap(([emoji, list]) =>
+    list.map((r) => ({ ...r, _emoji: emoji })),
+  );
+
+  if (!pos || rows.length === 0) return null;
+
+  return (
+    <div
+      data-reactors-popover
+      style={{
+        position: 'fixed',
+        top: pos.top,
+        left: pos.left,
+        width: POPOVER_WIDTH,
+        zIndex: 60,
+      }}
+      className="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-lg overflow-hidden"
+    >
+      <div className="px-3 py-1.5 text-[10px] font-display uppercase tracking-widest text-zinc-500 dark:text-zinc-400 border-b border-zinc-200/60 dark:border-zinc-800/60">
+        Reactions
+      </div>
+      <ul className="max-h-52 overflow-y-auto py-1">
+        {rows.map((r) => (
+          <li
+            key={`${r.user_id}-${r._emoji}`}
+            className="flex items-center gap-2 px-3 py-1"
+          >
+            {r.avatar_url ? (
+              <img
+                src={r.avatar_url}
+                alt=""
+                className="w-6 h-6 rounded-full object-cover border border-zinc-200 dark:border-zinc-700 shrink-0"
+              />
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center text-[10px] font-semibold shrink-0">
+                {r.display_name?.[0]?.toUpperCase() ?? '?'}
+              </div>
+            )}
+            <span className="flex-1 text-xs text-zinc-900 dark:text-zinc-100 truncate">
+              {r.display_name}
+            </span>
+            <span className="text-base leading-none shrink-0">{r._emoji}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -559,7 +690,7 @@ function ReactionPicker({
   onPick: (emoji: string) => void;
 }) {
   const PICKER_HEIGHT = 48;
-  const PICKER_WIDTH_EST = 240;
+  const PICKER_WIDTH_EST = 320;
   const PADDING = 8;
 
   const computePos = useCallback(() => {
