@@ -11,6 +11,8 @@ import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { markChatSeen } from '../lib/chat';
 import { formatError } from '../lib/errors';
+import { TierBadge } from './TierBadge';
+import { TIERS, type TierKey } from '../lib/tiers';
 import type { ChatMessageKind, MatchType } from '../lib/database.types';
 
 const REACTION_PALETTE = ['🔥', '👏', '😂', '❤️', '💪', '🤝', '😠', '😢'];
@@ -49,6 +51,8 @@ interface ChatMsg {
   body: string | null;
   match_type: MatchType | null;
   streak_count: number | null;
+  tier_key: string | null;
+  breaker_user_ids: string[] | null;
   created_at: string;
   display_name: string;
   avatar_url: string | null;
@@ -66,6 +70,9 @@ export function ClubChat() {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMsg[] | null>(null);
   const [reactions, setReactions] = useState<Reaction[]>([]);
+  // Display-name lookup for users referenced in breaker_user_ids on
+  // streak-ended messages. Populated lazily as messages load.
+  const [breakerNames, setBreakerNames] = useState<Record<string, string>>({});
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +96,7 @@ export function ClubChat() {
       const { data, error } = await supabase
         .from('chat_messages')
         .select(
-          'id, kind, user_id, body, match_type, streak_count, created_at, profiles:user_id(display_name, avatar_url)',
+          'id, kind, user_id, body, match_type, streak_count, tier_key, breaker_user_ids, created_at, profiles:user_id(display_name, avatar_url)',
         )
         .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
         .order('created_at', { ascending: false })
@@ -112,12 +119,36 @@ export function ClubChat() {
           body: r.body,
           match_type: r.match_type,
           streak_count: r.streak_count,
+          tier_key: r.tier_key ?? null,
+          breaker_user_ids: r.breaker_user_ids ?? null,
           created_at: r.created_at,
           display_name: r.profiles?.display_name ?? 'Player',
           avatar_url: r.profiles?.avatar_url ?? null,
         }))
         .reverse(); // oldest first → newest at bottom
       setMessages(flattened);
+
+      // Fetch display names for breakers referenced in any
+      // system_streak_ended message in this batch.
+      const breakerIds = new Set<string>();
+      for (const m of flattened) {
+        if (m.breaker_user_ids) for (const id of m.breaker_user_ids) breakerIds.add(id);
+      }
+      if (breakerIds.size > 0) {
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('id, display_name')
+          .in('id', Array.from(breakerIds));
+        if (active && profs) {
+          setBreakerNames((prev) => {
+            const next = { ...prev };
+            for (const p of profs as { id: string; display_name: string }[]) {
+              next[p.id] = p.display_name;
+            }
+            return next;
+          });
+        }
+      }
     }
 
     async function loadReactions() {
@@ -389,6 +420,7 @@ export function ClubChat() {
               isMine={m.user_id === user?.id}
               reactions={reactionsByMessage.get(m.id) ?? new Map()}
               currentUserId={user?.id ?? null}
+              breakerNames={breakerNames}
               pickerOpen={pickerForMsg === m.id}
               reactorsOpen={reactorsForMsg === m.id}
               onTogglePicker={() => {
@@ -442,6 +474,7 @@ interface RowProps {
   isMine: boolean;
   reactions: Map<string, Reaction[]>;
   currentUserId: string | null;
+  breakerNames: Record<string, string>;
   pickerOpen: boolean;
   reactorsOpen: boolean;
   onTogglePicker: () => void;
@@ -453,6 +486,12 @@ interface RowProps {
 function MessageRow(props: RowProps) {
   if (props.msg.kind === 'system_streak') {
     return <SystemStreakRow {...props} />;
+  }
+  if (props.msg.kind === 'system_tier_up') {
+    return <SystemTierUpRow {...props} />;
+  }
+  if (props.msg.kind === 'system_streak_ended') {
+    return <SystemStreakEndedRow {...props} />;
   }
   return <UserMessageRow {...props} />;
 }
@@ -519,6 +558,159 @@ function SystemStreakRow({
       </div>
     </div>
   );
+}
+
+function SystemTierUpRow({
+  msg,
+  reactions,
+  currentUserId,
+  pickerOpen,
+  reactorsOpen,
+  onTogglePicker,
+  onShowReactors,
+  onToggleReaction,
+}: RowProps) {
+  const tier = TIERS.find((t) => t.key === msg.tier_key);
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  const pillRef = useRef<HTMLDivElement>(null);
+  const longPress = useLongPress(onTogglePicker);
+
+  if (!tier) return null;
+
+  // Color the bubble in the tier's accent — picks up red for Predator,
+  // cyan for Diamond, amber for Gold, etc.
+  const tierKey = tier.key as TierKey;
+  const accentRgb = tierKeyToAccentRgb(tierKey);
+
+  return (
+    <div className="flex justify-start" data-msg-id={msg.id}>
+      <div className="max-w-[88%] flex flex-col items-start gap-1">
+        <div
+          className="text-[9px] font-display uppercase tracking-widest"
+          style={{ color: tier.toColor }}
+        >
+          System · Tier Up · {formatRelative(msg.created_at)}
+        </div>
+        <div
+          ref={bubbleRef}
+          {...longPress}
+          className="rounded-2xl rounded-bl-md px-3 py-2 text-[12px] leading-snug select-none cursor-pointer flex items-center gap-2"
+          style={{
+            background: `rgba(${accentRgb}, 0.12)`,
+            border: `1px solid rgba(${accentRgb}, 0.35)`,
+            color: 'inherit',
+          }}
+        >
+          <TierBadge
+            status={{ kind: 'tier', tier }}
+            size={22}
+            showName={false}
+            className="shrink-0"
+          />
+          <span className="text-zinc-900 dark:text-zinc-100">
+            <strong>{msg.display_name}</strong> reached{' '}
+            <span style={{ color: tier.toColor }} className="font-display tracking-wider uppercase">
+              {tier.name}
+            </span>{' '}
+            in {msg.match_type}!
+          </span>
+        </div>
+        {pickerOpen && (
+          <ReactionPicker
+            anchorRef={bubbleRef}
+            alignRight={false}
+            currentEmoji={findMyEmoji(reactions, currentUserId)}
+            onPick={onToggleReaction}
+          />
+        )}
+        <ReactionsBar
+          reactions={reactions}
+          currentUserId={currentUserId}
+          onShowReactors={onShowReactors}
+          barRef={pillRef}
+        />
+        {reactorsOpen && (
+          <ReactorsPopover
+            anchorRef={pillRef}
+            alignRight={false}
+            reactions={reactions}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SystemStreakEndedRow({
+  msg,
+  reactions,
+  currentUserId,
+  breakerNames,
+  pickerOpen,
+  reactorsOpen,
+  onTogglePicker,
+  onShowReactors,
+  onToggleReaction,
+}: RowProps) {
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  const pillRef = useRef<HTMLDivElement>(null);
+  const longPress = useLongPress(onTogglePicker);
+  const breakerLabel =
+    (msg.breaker_user_ids ?? [])
+      .map((id) => breakerNames[id] ?? 'someone')
+      .join(' & ') || 'someone';
+
+  return (
+    <div className="flex justify-start" data-msg-id={msg.id}>
+      <div className="max-w-[88%] flex flex-col items-start gap-1">
+        <div className="text-[9px] font-display uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+          System · Streak Broken · {formatRelative(msg.created_at)}
+        </div>
+        <div
+          ref={bubbleRef}
+          {...longPress}
+          className="rounded-2xl rounded-bl-md px-3 py-2 text-[12px] leading-snug select-none cursor-pointer bg-zinc-200/60 dark:bg-zinc-800/60 text-zinc-800 dark:text-zinc-100 border border-zinc-300/60 dark:border-zinc-700/60"
+        >
+          <strong>{msg.display_name}</strong>'s {msg.streak_count}-win{' '}
+          {msg.match_type} streak was ended by{' '}
+          <strong>{breakerLabel}</strong> 💔
+        </div>
+        {pickerOpen && (
+          <ReactionPicker
+            anchorRef={bubbleRef}
+            alignRight={false}
+            currentEmoji={findMyEmoji(reactions, currentUserId)}
+            onPick={onToggleReaction}
+          />
+        )}
+        <ReactionsBar
+          reactions={reactions}
+          currentUserId={currentUserId}
+          onShowReactors={onShowReactors}
+          barRef={pillRef}
+        />
+        {reactorsOpen && (
+          <ReactorsPopover
+            anchorRef={pillRef}
+            alignRight={false}
+            reactions={reactions}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Maps a tier key to its accent RGB triple, used inline in tier-up
+// bubble styling (rgba()-friendly).
+function tierKeyToAccentRgb(key: TierKey): string {
+  switch (key) {
+    case 'bronze':   return '180, 95, 39';
+    case 'silver':   return '160, 170, 185';
+    case 'gold':     return '218, 165, 32';
+    case 'diamond':  return '34, 211, 238';
+    case 'predator': return '239, 68, 68';
+  }
 }
 
 function UserMessageRow({

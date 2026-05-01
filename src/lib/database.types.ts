@@ -5,7 +5,11 @@ export type MatchType = 'singles' | 'doubles';
 export type MatchStatus = 'pending' | 'confirmed' | 'rejected' | 'expired';
 export type Team = 'A' | 'B';
 export type Confirmation = 'pending' | 'accepted' | 'rejected';
-export type ChatMessageKind = 'system_streak' | 'user';
+export type ChatMessageKind =
+  | 'system_streak'
+  | 'system_tier_up'
+  | 'system_streak_ended'
+  | 'user';
 
 export interface Database {
   public: {
@@ -85,6 +89,8 @@ export interface Database {
           body: string | null;
           match_type: MatchType | null;
           streak_count: number | null;
+          tier_key: string | null;
+          breaker_user_ids: string[] | null;
           created_at: string;
           expires_at: string | null;
         };
@@ -95,6 +101,8 @@ export interface Database {
           body?: string | null;
           match_type?: MatchType | null;
           streak_count?: number | null;
+          tier_key?: string | null;
+          breaker_user_ids?: string[] | null;
           created_at?: string;
           expires_at?: string | null;
         };

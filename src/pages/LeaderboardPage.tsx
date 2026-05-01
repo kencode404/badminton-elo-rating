@@ -224,7 +224,7 @@ function Row({
         {showMedal ? (
           <Medal rank={rank as 1 | 2 | 3} />
         ) : (
-          <div className="w-12 text-center font-display text-sm text-zinc-500 dark:text-zinc-400 shrink-0">
+          <div className="w-9 text-center font-display text-sm text-zinc-500 dark:text-zinc-400 shrink-0">
             #{rank}
           </div>
         )}
@@ -242,7 +242,7 @@ function Row({
           <span className="truncate">{profile.display_name}</span>
           {streak >= 2 && (
             <span
-              className={`text-[10px] font-display tracking-wider px-1.5 py-0.5 rounded shrink-0 ${
+              className={`text-[10px] font-display tracking-wider px-1 py-0.5 rounded shrink-0 ${
                 streak >= 3
                   ? 'bg-orange-500/15 text-orange-500'
                   : 'bg-amber-500/10 text-amber-500'
@@ -254,7 +254,7 @@ function Row({
                 } ease-in-out infinite`,
               }}
             >
-              {streak} wins
+              🔥{streak}
             </span>
           )}
           {isMe && <span className="text-[9px] tracking-widest ml-1">· you</span>}
@@ -264,7 +264,7 @@ function Row({
         </div>
       </div>
 
-        <div className="shrink-0 w-[92px] flex flex-col items-center gap-2 self-start">
+        <div className="shrink-0 w-[72px] flex flex-col items-center gap-1.5 self-start">
           <TierBadge status={status} size={tierBadgeSize(status)} showName />
           <TierProgress status={status} rating={rating} />
         </div>
@@ -401,13 +401,13 @@ function ProgressBar({ pct }: { pct: number }) {
 // bigger so the climb is visible at a glance — Predator stands out,
 // Bronze/placement stay modest.
 function tierBadgeSize(status: RatingStatus): number {
-  if (status.kind === 'placement') return 36;
+  if (status.kind === 'placement') return 30;
   switch (status.tier.key) {
-    case 'bronze':   return 38;
-    case 'silver':   return 42;
-    case 'gold':     return 46;
-    case 'diamond':  return 50;
-    case 'predator': return 54;
+    case 'bronze':   return 32;
+    case 'silver':   return 34;
+    case 'gold':     return 38;
+    case 'diamond':  return 42;
+    case 'predator': return 46;
   }
 }
 
@@ -481,7 +481,7 @@ const MEDAL_PALETTES: Record<
     glow: 'rgba(251, 146, 60, 0.55)',
   },
 };
-const MEDAL_PX: Record<1 | 2 | 3, number> = { 1: 44, 2: 38, 3: 36 };
+const MEDAL_PX: Record<1 | 2 | 3, number> = { 1: 36, 2: 32, 3: 30 };
 
 function Medal({ rank }: { rank: 1 | 2 | 3 }) {
   const p = MEDAL_PALETTES[rank];
@@ -491,8 +491,8 @@ function Medal({ rank }: { rank: 1 | 2 | 3 }) {
   const idBase = `medal-${rank}`;
   return (
     <div
-      className="w-12 flex items-center justify-center shrink-0"
-      style={{ height: 44 }}
+      className="w-9 flex items-center justify-center shrink-0"
+      style={{ height: 36 }}
       aria-label={`Rank ${rank}`}
     >
       <svg
