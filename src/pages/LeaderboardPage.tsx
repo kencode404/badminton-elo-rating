@@ -182,7 +182,7 @@ function Row({
         {showMedal ? (
           <Medal rank={rank as 1 | 2 | 3} />
         ) : (
-          <div className="w-10 text-center font-display text-sm text-zinc-500 dark:text-zinc-400 shrink-0">
+          <div className="w-12 text-center font-display text-sm text-zinc-500 dark:text-zinc-400 shrink-0">
             #{rank}
           </div>
         )}
@@ -332,62 +332,145 @@ function orderForTab(rows: Profile[], tab: Tab): Profile[] {
   return [...tiered, ...placement];
 }
 
-const MEDAL_STYLES: Record<
+// Futuristic rank medal: faceted hex frame with metallic gradient,
+// inset bevel, top highlight strip, and a bold display numeral.
+// Sizes step down by rank so the podium hierarchy reads at a glance.
+const MEDAL_PALETTES: Record<
   1 | 2 | 3,
-  { emoji: string; halo: string; ring: string; size: string }
+  { from: string; mid: string; to: string; stroke: string; glow: string }
 > = {
   1: {
-    emoji: '🥇',
-    halo: 'rgba(251, 191, 36, 0.55)',
-    ring: 'rgba(251, 191, 36, 0.85)',
-    size: 'text-[26px]',
+    from: '#fff3b0',
+    mid: '#facc15',
+    to: '#a16207',
+    stroke: '#5a3d05',
+    glow: 'rgba(251, 191, 36, 0.65)',
   },
   2: {
-    emoji: '🥈',
-    halo: 'rgba(212, 212, 216, 0.45)',
-    ring: 'rgba(212, 212, 216, 0.70)',
-    size: 'text-[22px]',
+    from: '#fafafa',
+    mid: '#d4d4d8',
+    to: '#52525b',
+    stroke: '#3f3f46',
+    glow: 'rgba(212, 212, 216, 0.55)',
   },
   3: {
-    emoji: '🥉',
-    halo: 'rgba(251, 146, 60, 0.45)',
-    ring: 'rgba(251, 146, 60, 0.70)',
-    size: 'text-[22px]',
+    from: '#ffe4cc',
+    mid: '#fb923c',
+    to: '#7c2d12',
+    stroke: '#5b1d08',
+    glow: 'rgba(251, 146, 60, 0.55)',
   },
 };
+const MEDAL_PX: Record<1 | 2 | 3, number> = { 1: 44, 2: 38, 3: 36 };
 
 function Medal({ rank }: { rank: 1 | 2 | 3 }) {
-  const cfg = MEDAL_STYLES[rank];
+  const p = MEDAL_PALETTES[rank];
+  const px = MEDAL_PX[rank];
+  // Reserve a fixed-width slot so all leaderboard rows align even
+  // when the medal SVG itself shrinks for #2/#3.
+  const idBase = `medal-${rank}`;
   return (
     <div
-      className="relative w-10 h-10 flex items-center justify-center shrink-0"
+      className="w-12 flex items-center justify-center shrink-0"
+      style={{ height: 44 }}
       aria-label={`Rank ${rank}`}
     >
-      {/* outer halo */}
-      <span
-        className="absolute inset-0 rounded-full pointer-events-none"
+      <svg
+        width={px}
+        height={px}
+        viewBox="0 0 48 48"
         style={{
-          background: `radial-gradient(circle, ${cfg.halo} 0%, transparent 70%)`,
+          filter: `drop-shadow(0 0 6px ${p.glow})`,
           animation:
-            rank === 1 ? 'pill-pulse 2.2s ease-in-out infinite' : undefined,
+            rank === 1 ? 'pill-pulse 2.4s ease-in-out infinite' : undefined,
         }}
         aria-hidden
-      />
-      {/* thin ring for definition */}
-      <span
-        className="absolute inset-1 rounded-full pointer-events-none"
-        style={{
-          border: `1px solid ${cfg.ring}`,
-          boxShadow: `inset 0 0 6px ${cfg.halo}`,
-        }}
-        aria-hidden
-      />
-      <span
-        className={`relative z-10 leading-none ${cfg.size}`}
-        style={{ filter: `drop-shadow(0 1px 2px ${cfg.halo})` }}
       >
-        {cfg.emoji}
-      </span>
+        <defs>
+          <linearGradient id={`${idBase}-frame`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={p.from} />
+            <stop offset="55%" stopColor={p.mid} />
+            <stop offset="100%" stopColor={p.to} />
+          </linearGradient>
+          <linearGradient id={`${idBase}-hi`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="white" stopOpacity="0.7" />
+            <stop offset="100%" stopColor="white" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {/* Outer hex frame, pointy top/bottom */}
+        <polygon
+          points="24,3 41,13 41,35 24,45 7,35 7,13"
+          fill={`url(#${idBase}-frame)`}
+          stroke={p.stroke}
+          strokeWidth="0.9"
+        />
+        {/* Inset bevel */}
+        <polygon
+          points="24,7 37.5,15 37.5,33 24,41 10.5,33 10.5,15"
+          fill="none"
+          stroke="rgba(0,0,0,0.30)"
+          strokeWidth="0.6"
+        />
+        {/* Top highlight strip */}
+        <polygon
+          points="24,4.5 39.5,13.5 39.5,19 24,11 8.5,19 8.5,13.5"
+          fill={`url(#${idBase}-hi)`}
+        />
+        {/* Side facet lines for the sci-fi vibe */}
+        <line
+          x1="7"
+          y1="13"
+          x2="11"
+          y2="15.5"
+          stroke="rgba(255,255,255,0.35)"
+          strokeWidth="0.5"
+        />
+        <line
+          x1="41"
+          y1="13"
+          x2="37"
+          y2="15.5"
+          stroke="rgba(0,0,0,0.30)"
+          strokeWidth="0.5"
+        />
+        <line
+          x1="7"
+          y1="35"
+          x2="11"
+          y2="32.5"
+          stroke="rgba(0,0,0,0.30)"
+          strokeWidth="0.5"
+        />
+        <line
+          x1="41"
+          y1="35"
+          x2="37"
+          y2="32.5"
+          stroke="rgba(255,255,255,0.20)"
+          strokeWidth="0.5"
+        />
+        {/* Rank numeral. paintOrder: stroke draws the stroke first, then
+            the fill on top — gives a clean outlined character. */}
+        <text
+          x="24"
+          y="33"
+          textAnchor="middle"
+          fontFamily="'Orbitron', 'Rajdhani', system-ui, sans-serif"
+          fontSize="22"
+          fontWeight="900"
+          fill="white"
+          stroke="rgba(0, 0, 0, 0.85)"
+          strokeWidth="2"
+          strokeLinejoin="round"
+          style={{
+            paintOrder: 'stroke',
+            letterSpacing: '0.5px',
+          }}
+        >
+          {rank}
+        </text>
+      </svg>
     </div>
   );
 }
