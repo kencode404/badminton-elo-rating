@@ -88,7 +88,7 @@ function PastSeasonModeStat({
             <TierBadge status={{ kind: 'tier', tier }} size={20} showName />
           </div>
           <div className="text-[10px] text-zinc-700 dark:text-zinc-300 mt-1 font-display tracking-wider">
-            {wins} wins · {winRate}%
+            {wins} wins · {winRate}% rate
           </div>
         </>
       ) : (

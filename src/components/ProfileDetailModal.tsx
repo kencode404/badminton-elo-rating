@@ -268,7 +268,7 @@ function ModeStat({
         {games} games
       </div>
       <div className="text-[10px] text-zinc-700 dark:text-zinc-300 mt-0.5 font-display tracking-wider">
-        {winRate !== null ? `${wins} wins · ${winRate}%` : '—'}
+        {winRate !== null ? `${wins} wins · ${winRate}% rate` : '—'}
       </div>
     </div>
   );
