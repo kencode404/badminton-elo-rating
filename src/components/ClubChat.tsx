@@ -570,8 +570,9 @@ function ReactionsBar({
 }
 
 // Compact popover listing each reactor + the emoji they used. Anchored
-// to the reactions pill, position:fixed (escapes chat panel overflow),
-// scrollable when the list is long, capped to fit phone widths.
+// to the reactions pill, position:fixed (escapes chat panel overflow).
+// Defaults to below-the-pill so it visually attaches to the reaction
+// it describes; flips above only if there isn't enough room below.
 function ReactorsPopover({
   anchorRef,
   alignRight,
@@ -581,24 +582,39 @@ function ReactorsPopover({
   alignRight: boolean;
   reactions: Map<string, Reaction[]>;
 }) {
-  const POPOVER_HEIGHT = 220; // approx, used for above/below decision
   const POPOVER_WIDTH = 220;
+  const MIN_ROOM_BELOW = 120;
+  const MAX_HEIGHT = 260;
   const PADDING = 8;
 
   const computePos = useCallback(() => {
     const el = anchorRef.current;
     if (!el) return null;
     const r = el.getBoundingClientRect();
-    const above = r.top - POPOVER_HEIGHT - PADDING;
-    const below = r.bottom + PADDING;
-    const top = above >= PADDING ? above : below;
     const left = alignRight
       ? Math.max(PADDING, r.right - POPOVER_WIDTH)
-      : Math.min(window.innerWidth - POPOVER_WIDTH - PADDING, Math.max(PADDING, r.left));
-    return { top, left };
+      : Math.min(
+          window.innerWidth - POPOVER_WIDTH - PADDING,
+          Math.max(PADDING, r.left),
+        );
+
+    const spaceBelow = window.innerHeight - r.bottom - PADDING * 2;
+    const spaceAbove = r.top - PADDING * 2;
+
+    if (spaceBelow >= MIN_ROOM_BELOW || spaceBelow >= spaceAbove) {
+      return {
+        top: r.bottom + PADDING,
+        left,
+        maxHeight: Math.min(MAX_HEIGHT, spaceBelow),
+      };
+    }
+    const h = Math.min(MAX_HEIGHT, spaceAbove);
+    return { top: r.top - h - PADDING, left, maxHeight: h };
   }, [anchorRef, alignRight]);
 
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(computePos);
+  const [pos, setPos] = useState<
+    { top: number; left: number; maxHeight: number } | null
+  >(computePos);
 
   useEffect(() => {
     setPos(computePos());
@@ -613,7 +629,6 @@ function ReactorsPopover({
     };
   }, [computePos]);
 
-  // Flat list, grouped by emoji order. Each row: avatar, name, emoji.
   const rows = Array.from(reactions.entries()).flatMap(([emoji, list]) =>
     list.map((r) => ({ ...r, _emoji: emoji })),
   );
@@ -628,14 +643,15 @@ function ReactorsPopover({
         top: pos.top,
         left: pos.left,
         width: POPOVER_WIDTH,
+        maxHeight: pos.maxHeight,
         zIndex: 60,
       }}
-      className="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-lg overflow-hidden"
+      className="flex flex-col rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-lg overflow-hidden"
     >
-      <div className="px-3 py-1.5 text-[10px] font-display uppercase tracking-widest text-zinc-500 dark:text-zinc-400 border-b border-zinc-200/60 dark:border-zinc-800/60">
+      <div className="px-3 py-1.5 text-[10px] font-display uppercase tracking-widest text-zinc-500 dark:text-zinc-400 border-b border-zinc-200/60 dark:border-zinc-800/60 shrink-0">
         Reactions
       </div>
-      <ul className="max-h-52 overflow-y-auto py-1">
+      <ul className="overflow-y-auto py-1">
         {rows.map((r) => (
           <li
             key={`${r.user_id}-${r._emoji}`}
