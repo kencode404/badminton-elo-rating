@@ -1,42 +1,29 @@
 import { TierBadge } from './TierBadge';
 import { ratingToTier } from '../lib/tiers';
-import type { PastSeasonSnapshot } from './PastSeasonRow';
 
 interface Props {
   profile: {
-    singles_rating: number;
-    doubles_rating: number;
-    singles_games_played: number;
-    doubles_games_played: number;
+    peak_singles_rating: number;
+    peak_doubles_rating: number;
   } | null;
-  snapshots: PastSeasonSnapshot[] | null;
   // sm = profile page (slightly larger label + badge)
   // xs = leaderboard modal (compact)
   size?: 'sm' | 'xs';
 }
 
+const STARTING_RATING = 1000;
+
 // Renders a "Peak Doubles · TIER" / "Peak Singles · TIER" pair using
-// the highest rating the player has ever held in each mode (current
-// rating + all past-season snapshots). A mode only renders if the
-// player has actually played at least one game in it.
-export function PeakTiers({ profile, snapshots, size = 'sm' }: Props) {
-  if (!profile || snapshots === null) return null;
+// the lifetime peak rating per mode stored directly on the profile.
+// settle_match keeps these monotonic; reset_season() doesn't touch
+// them, so a player's all-time best tier survives season resets and
+// past-season snapshot trimming.
+export function PeakTiers({ profile, size = 'sm' }: Props) {
+  if (!profile) return null;
 
-  const doublesPeak = peakRating(
-    profile.doubles_rating,
-    profile.doubles_games_played,
-    snapshots,
-    'doubles',
-  );
-  const singlesPeak = peakRating(
-    profile.singles_rating,
-    profile.singles_games_played,
-    snapshots,
-    'singles',
-  );
-
-  // Nothing to show — player has never played a confirmed match.
-  if (doublesPeak === null && singlesPeak === null) return null;
+  const showDoubles = profile.peak_doubles_rating > STARTING_RATING;
+  const showSingles = profile.peak_singles_rating > STARTING_RATING;
+  if (!showDoubles && !showSingles) return null;
 
   const labelClass =
     size === 'xs'
@@ -51,18 +38,18 @@ export function PeakTiers({ profile, snapshots, size = 'sm' }: Props) {
         size === 'xs' ? 'mt-1' : 'mt-2'
       }`}
     >
-      {doublesPeak !== null && (
+      {showDoubles && (
         <PeakLine
           label="Peak Doubles"
-          rating={doublesPeak}
+          rating={profile.peak_doubles_rating}
           labelClass={labelClass}
           badgeSize={badgeSize}
         />
       )}
-      {singlesPeak !== null && (
+      {showSingles && (
         <PeakLine
           label="Peak Singles"
-          rating={singlesPeak}
+          rating={profile.peak_singles_rating}
           labelClass={labelClass}
           badgeSize={badgeSize}
         />
@@ -106,23 +93,4 @@ function PeakLine({
       </span>
     </div>
   );
-}
-
-function peakRating(
-  currentRating: number,
-  currentGames: number,
-  snapshots: PastSeasonSnapshot[],
-  mode: 'singles' | 'doubles',
-): number | null {
-  const ratings: number[] = [];
-  if (currentGames > 0) ratings.push(currentRating);
-  for (const s of snapshots) {
-    const games =
-      mode === 'singles' ? s.singles_games_played : s.doubles_games_played;
-    if (games > 0) {
-      ratings.push(mode === 'singles' ? s.singles_rating : s.doubles_rating);
-    }
-  }
-  if (ratings.length === 0) return null;
-  return Math.max(...ratings);
 }

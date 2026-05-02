@@ -23,6 +23,8 @@ export interface Database {
           doubles_rating: number;
           singles_games_played: number;
           doubles_games_played: number;
+          peak_singles_rating: number;
+          peak_doubles_rating: number;
           created_at: string;
           chat_last_seen_at: string;
           is_admin: boolean;
@@ -35,6 +37,8 @@ export interface Database {
           doubles_rating?: number;
           singles_games_played?: number;
           doubles_games_played?: number;
+          peak_singles_rating?: number;
+          peak_doubles_rating?: number;
           chat_last_seen_at?: string;
           is_admin?: boolean;
         };
@@ -45,6 +49,8 @@ export interface Database {
           doubles_rating?: number;
           singles_games_played?: number;
           doubles_games_played?: number;
+          peak_singles_rating?: number;
+          peak_doubles_rating?: number;
           chat_last_seen_at?: string;
           is_admin?: boolean;
         };

@@ -58,13 +58,26 @@ create table if not exists public.profiles (
   doubles_rating int not null default 1000,
   singles_games_played int not null default 0 check (singles_games_played >= 0),
   doubles_games_played int not null default 0 check (doubles_games_played >= 0),
+  -- Lifetime peak rating per mode. Bumped monotonically by
+  -- settle_match (never decreases). Survives season resets so a
+  -- player's all-time best tier is always visible.
+  peak_singles_rating int not null default 1000,
+  peak_doubles_rating int not null default 1000,
   created_at timestamptz not null default now(),
   is_admin boolean not null default false
 );
 
 -- Idempotent column adds for existing prod that pre-dates the column.
 alter table public.profiles
-  add column if not exists is_admin boolean not null default false;
+  add column if not exists is_admin boolean not null default false,
+  add column if not exists peak_singles_rating int not null default 1000,
+  add column if not exists peak_doubles_rating int not null default 1000;
+
+-- Idempotent backfill: peak >= current rating. Re-running is a no-op
+-- because greatest() is monotonic.
+update public.profiles
+   set peak_singles_rating = greatest(peak_singles_rating, singles_rating),
+       peak_doubles_rating = greatest(peak_doubles_rating, doubles_rating);
 
 create index if not exists profiles_singles_rating_idx on public.profiles (singles_rating desc);
 create index if not exists profiles_doubles_rating_idx on public.profiles (doubles_rating desc);
@@ -229,6 +242,7 @@ declare
   actual_b numeric;
   rating_col text;
   games_col text;
+  peak_col text;
   participant record;
   current_rating int;
   current_games int;
@@ -257,9 +271,11 @@ begin
   if m.match_type = 'singles' then
     rating_col := 'singles_rating';
     games_col := 'singles_games_played';
+    peak_col := 'peak_singles_rating';
   else
     rating_col := 'doubles_rating';
     games_col := 'doubles_games_played';
+    peak_col := 'peak_doubles_rating';
   end if;
 
   -- Compute team mean ratings.
@@ -323,9 +339,19 @@ begin
            rating_delta = delta
      where match_id = p_match_id and user_id = participant.user_id;
 
+    -- Bump rating, increment games, and ratchet peak monotonically.
+    -- Set expressions in a single UPDATE reference the OLD row, so
+    -- greatest(peak_col, rating_col + $1) compares old peak to the
+    -- post-update rating.
     execute format(
-      'update public.profiles set %I = %I + $1, %I = %I + 1 where id = $2',
-      rating_col, rating_col, games_col, games_col
+      'update public.profiles
+          set %I = %I + $1,
+              %I = %I + 1,
+              %I = greatest(%I, %I + $1)
+        where id = $2',
+      rating_col, rating_col,
+      games_col, games_col,
+      peak_col, peak_col, rating_col
     ) using delta, participant.user_id;
   end loop;
 

@@ -158,7 +158,7 @@ export function ProfileDetailModal({ userId, onClose }: Props) {
             <div className="text-[10px] text-zinc-500 dark:text-zinc-500 uppercase tracking-widest">
               Member since {profile?.created_at ? formatYearMonth(profile.created_at) : '—'}
             </div>
-            <PeakTiers profile={profile} snapshots={snapshots} size="xs" />
+            <PeakTiers profile={profile} size="xs" />
           </div>
         </section>
 

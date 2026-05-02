@@ -168,7 +168,34 @@ $$;
 grant execute on function public.reset_season() to authenticated;
 
 -- =========================================================================
--- 3. Grant admin to khieng96@gmail.com (idempotent)
+-- 3. Backfill peak ratings from any historical snapshots
+--
+-- profiles.peak_X_rating defaults to 1000 and is bumped by settle_match
+-- going forward. For prod that already has past-season snapshots with
+-- higher ratings, ratchet the peak from those rows once. Idempotent —
+-- subsequent runs are a no-op because greatest() is monotonic.
+-- =========================================================================
+
+update public.profiles p
+   set peak_singles_rating = greatest(
+         p.peak_singles_rating,
+         coalesce((
+           select max(s.singles_rating)
+             from public.season_snapshots s
+            where s.user_id = p.id
+         ), 0)
+       ),
+       peak_doubles_rating = greatest(
+         p.peak_doubles_rating,
+         coalesce((
+           select max(s.doubles_rating)
+             from public.season_snapshots s
+            where s.user_id = p.id
+         ), 0)
+       );
+
+-- =========================================================================
+-- 4. Grant admin to khieng96@gmail.com (idempotent)
 -- =========================================================================
 
 update public.profiles

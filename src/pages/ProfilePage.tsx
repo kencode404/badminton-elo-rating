@@ -324,7 +324,7 @@ export function ProfilePage() {
         )}
         <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1">{user?.email}</p>
         <div className="flex justify-center">
-          <PeakTiers profile={profile} snapshots={snapshots} size="sm" />
+          <PeakTiers profile={profile} size="sm" />
         </div>
       </section>
 
