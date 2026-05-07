@@ -62,6 +62,8 @@ Mock messages, newest first:
 | `system_tier_up`      | Erin   | Predator, doubles       | Red accent + predator image      |
 | `system_streak_ended` | Frank  | 4-win singles streak    | One breaker (Carol)              |
 | `system_streak_ended` | Gina   | 6-win doubles streak    | Two breakers (Carol & Dave)      |
+| `system_user_banned`  | Hank   | —                       | Quiet centered grey log line     |
+| `system_season_reset` | Boss Ken | —                     | Quiet centered grey log line     |
 
 The preview also seeds two breaker names (`preview-breaker-1` →
 Carol, `preview-breaker-2` → Dave) so the streak-ended bubbles render

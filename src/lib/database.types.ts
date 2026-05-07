@@ -9,6 +9,8 @@ export type ChatMessageKind =
   | 'system_streak'
   | 'system_tier_up'
   | 'system_streak_ended'
+  | 'system_season_reset'
+  | 'system_user_banned'
   | 'user';
 
 export interface Database {
@@ -28,6 +30,10 @@ export interface Database {
           created_at: string;
           chat_last_seen_at: string;
           is_admin: boolean;
+          is_banned: boolean;
+          banned_at: string | null;
+          banned_by: string | null;
+          banned_reason: string | null;
         };
         Insert: {
           id: string;
@@ -41,6 +47,10 @@ export interface Database {
           peak_doubles_rating?: number;
           chat_last_seen_at?: string;
           is_admin?: boolean;
+          is_banned?: boolean;
+          banned_at?: string | null;
+          banned_by?: string | null;
+          banned_reason?: string | null;
         };
         Update: {
           display_name?: string;
@@ -53,6 +63,10 @@ export interface Database {
           peak_doubles_rating?: number;
           chat_last_seen_at?: string;
           is_admin?: boolean;
+          is_banned?: boolean;
+          banned_at?: string | null;
+          banned_by?: string | null;
+          banned_reason?: string | null;
         };
         Relationships: [];
       };
@@ -216,6 +230,14 @@ export interface Database {
       reset_season: {
         Args: Record<PropertyKey, never>;
         Returns: number;
+      };
+      ban_user: {
+        Args: { p_target_id: string; p_reason?: string | null };
+        Returns: void;
+      };
+      unban_user: {
+        Args: { p_target_id: string };
+        Returns: void;
       };
       get_win_streaks: {
         Args: Record<PropertyKey, never>;

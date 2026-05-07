@@ -25,6 +25,7 @@ export async function searchPlayers(
   let q = supabase
     .from('profiles')
     .select('id, display_name, avatar_url')
+    .eq('is_banned', false)
     .order('display_name', { ascending: true })
     .limit(limit);
 

@@ -4,6 +4,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { NotificationBell } from './NotificationBell';
 import { RankChangeOverlay } from './RankChangeOverlay';
 import { useChatUnread } from '../lib/chat';
+import { useBanWatcher } from '../lib/auth';
 import { useRankDemote } from '../lib/rank';
 import { TIERS, type TierKey } from '../lib/tiers';
 
@@ -28,6 +29,11 @@ export function AppShell() {
   // FlatTab would create multiple Realtime channels with the same name
   // and Supabase rejects the duplicate subscriptions.
   const chatUnread = useChatUnread();
+
+  // Force-sign-out the user instantly if their is_banned flag flips
+  // to true mid-session. The next sign-in attempt will surface the
+  // ban message via the post-handshake check in signInWithPassword.
+  useBanWatcher();
 
   // Live tier-demotion watcher. Fires the overlay when the player's
   // own rating drops into a lower tier — both via a fresh profile

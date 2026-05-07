@@ -517,7 +517,25 @@ function MessageRow(props: RowProps) {
   if (props.msg.kind === 'system_streak_ended') {
     return <SystemStreakEndedRow {...props} />;
   }
+  if (
+    props.msg.kind === 'system_season_reset' ||
+    props.msg.kind === 'system_user_banned'
+  ) {
+    return <SystemLogRow msg={props.msg} />;
+  }
   return <UserMessageRow {...props} />;
+}
+
+// Quiet centered log line for moderation events (season reset, ban).
+// Intentionally less prominent than the streak/tier announcements.
+function SystemLogRow({ msg }: { msg: ChatMsg }) {
+  return (
+    <div className="flex justify-center" data-msg-id={msg.id}>
+      <div className="text-[10px] text-zinc-500 dark:text-zinc-500 italic px-3 py-1 max-w-[88%] text-center">
+        · {msg.body} · {formatRelative(msg.created_at)}
+      </div>
+    </div>
+  );
 }
 
 function SystemStreakRow({
@@ -825,6 +843,32 @@ function buildPreviewAnnouncements(): ChatMsg[] {
       breaker_user_ids: ['preview-breaker-1', 'preview-breaker-2'],
       created_at: ago(30),
       display_name: 'Gina',
+      avatar_url: null,
+    },
+    {
+      id: 'preview-banned',
+      kind: 'system_user_banned',
+      user_id: 'preview-user-banned',
+      body: 'Hank banned by Boss Ken',
+      match_type: null,
+      streak_count: null,
+      tier_key: null,
+      breaker_user_ids: null,
+      created_at: ago(45),
+      display_name: 'Hank',
+      avatar_url: null,
+    },
+    {
+      id: 'preview-season-reset',
+      kind: 'system_season_reset',
+      user_id: 'preview-admin',
+      body: 'Season 1 reset by Boss Ken',
+      match_type: null,
+      streak_count: null,
+      tier_key: null,
+      breaker_user_ids: null,
+      created_at: ago(60),
+      display_name: 'Boss Ken',
       avatar_url: null,
     },
   ];

@@ -41,13 +41,6 @@ export function ProfilePage() {
     doubles_rank: number | null;
   };
   const [snapshots, setSnapshots] = useState<SnapshotRow[] | null>(null);
-  const [resetting, setResetting] = useState(false);
-  // Type-to-confirm guard: the reset button is initially disabled and
-  // only fires once the admin has explicitly typed RESET_PHRASE into
-  // the inline confirmation input.
-  const RESET_PHRASE = 'RESET SEASON';
-  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
-  const [resetConfirmText, setResetConfirmText] = useState('');
 
   // ?preview=tiers also seeds three mock past-season snapshots so the
   // new Past Seasons Record layout can be inspected before any reset
@@ -137,35 +130,6 @@ export function ProfilePage() {
       active = false;
     };
   }, [user]);
-
-  async function resetSeason() {
-    if (!user || !profile?.is_admin) return;
-    if (resetConfirmText.trim().toUpperCase() !== RESET_PHRASE) return;
-    setResetting(true);
-    setError(null);
-    const { error } = await supabase.rpc('reset_season');
-    setResetting(false);
-    if (error) {
-      setError(error.message);
-      return;
-    }
-    setResetConfirmOpen(false);
-    setResetConfirmText('');
-    // Refresh local state — pull profile + snapshots again
-    const [{ data: p }, { data: snaps }] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
-      supabase
-        .from('season_snapshots')
-        .select(
-          'season_number, archived_at, singles_rating, doubles_rating, singles_games_played, doubles_games_played',
-        )
-        .eq('user_id', user.id)
-        .order('season_number', { ascending: false }),
-    ]);
-    if (p) setProfile(p);
-    setSnapshots((snaps ?? []) as SnapshotRow[]);
-    setWinCounts({ singles: 0, doubles: 0 });
-  }
 
   async function saveName() {
     if (!user || !profile) return;
@@ -406,70 +370,33 @@ export function ProfilePage() {
       </section>
 
       {profile?.is_admin && (
-        <section className="glass-panel p-5 border-red-400/40 dark:border-red-500/30">
-          <div className="section-title mb-2 text-red-500 dark:text-red-400">
-            Admin · Season Reset
-          </div>
-          <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-3">
-            Archives every player's current ratings into a past-season
-            snapshot, then resets the whole club to 1000 with 0 games.
-            Stale streak/tier-up announcements in chat are cleared.
-            <strong className="text-red-500 dark:text-red-400"> This cannot be undone.</strong>
-          </p>
-
-          {!resetConfirmOpen ? (
-            <button
-              type="button"
-              onClick={() => setResetConfirmOpen(true)}
-              className="w-full rounded-lg border border-red-400/60 dark:border-red-500/40 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-display tracking-widest uppercase text-xs py-2 transition"
+        <Link
+          to="/admin"
+          className="glass-panel w-full p-4 flex items-center justify-between border-red-400/40 dark:border-red-500/30 border-dashed hover:border-red-400/80 transition group"
+        >
+          <div className="flex items-center gap-3">
+            <span
+              className="w-9 h-9 rounded-lg flex items-center justify-center text-red-500 dark:text-red-400 border border-red-400/40"
+              style={{
+                background: 'linear-gradient(135deg, #2a0d0d 0%, #18181b 100%)',
+              }}
+              aria-hidden
             >
-              Reset Season…
-            </button>
-          ) : (
-            <div className="space-y-2">
-              <label
-                htmlFor="reset-confirm"
-                className="text-[10px] font-display tracking-widest uppercase text-zinc-600 dark:text-zinc-400 block"
-              >
-                Type <span className="text-red-500 dark:text-red-400">{RESET_PHRASE}</span> to confirm:
-              </label>
-              <input
-                id="reset-confirm"
-                autoFocus
-                value={resetConfirmText}
-                onChange={(e) => setResetConfirmText(e.target.value)}
-                disabled={resetting}
-                spellCheck={false}
-                autoComplete="off"
-                className="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400/40 disabled:opacity-50"
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setResetConfirmOpen(false);
-                    setResetConfirmText('');
-                  }}
-                  disabled={resetting}
-                  className="flex-1 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-display tracking-widest uppercase text-xs py-2 transition disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={resetSeason}
-                  disabled={
-                    resetting ||
-                    resetConfirmText.trim().toUpperCase() !== RESET_PHRASE
-                  }
-                  className="flex-1 rounded-lg border border-red-400/60 dark:border-red-500/40 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-display tracking-widest uppercase text-xs py-2 transition disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  {resetting ? 'Resetting…' : 'Confirm Reset'}
-                </button>
+              ⚙
+            </span>
+            <div className="text-left">
+              <div className="font-display uppercase tracking-widest text-red-500 dark:text-red-400 text-sm">
+                Apex Command
+              </div>
+              <div className="text-[10px] text-zinc-500 dark:text-zinc-500 uppercase tracking-widest mt-0.5">
+                Admin Access
               </div>
             </div>
-          )}
-        </section>
+          </div>
+          <span className="text-zinc-400 dark:text-zinc-600 group-hover:text-red-400 transition" aria-hidden>
+            →
+          </span>
+        </Link>
       )}
 
       <Link

@@ -52,8 +52,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithPassword = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error: error.message };
+    // Reject banned accounts. The handshake already established a
+    // session, so we have to look up the profile and force-sign-out
+    // if banned. Surface the same kind of generic-feeling message as
+    // a wrong-credentials failure.
+    const userId = data.user?.id;
+    if (userId) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_banned')
+        .eq('id', userId)
+        .maybeSingle();
+      if (profile?.is_banned) {
+        await supabase.auth.signOut();
+        return { error: 'Your account has been banned.' };
+      }
+    }
+    return { error: null };
   }, []);
 
   const signUpWithPassword = useCallback(
@@ -103,6 +120,53 @@ export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
   return ctx;
+}
+
+// Watches the current user's own profile row for the is_banned flag.
+// If a ban is applied while the user is signed in, force-sign-out
+// instantly. Their next sign-in attempt will hit the post-handshake
+// is_banned check in signInWithPassword and surface the ban message.
+export function useBanWatcher() {
+  const { user, signOut } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+
+    // Catch-up: handle the rare case where the user was banned in the
+    // brief gap between session restore and now.
+    supabase
+      .from('profiles')
+      .select('is_banned')
+      .eq('id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active && data?.is_banned) signOut();
+      });
+
+    const channel = supabase
+      .channel(`profile-ban-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (!active) return;
+          const next = payload.new as { is_banned?: boolean };
+          if (next.is_banned) signOut();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, [user, signOut]);
 }
 
 export function RequireAuth({ children }: { children: ReactNode }) {

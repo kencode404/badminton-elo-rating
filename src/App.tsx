@@ -5,6 +5,7 @@ import { LeaderboardPage } from './pages/LeaderboardPage';
 import { RecordMatchPage } from './pages/RecordMatchPage';
 import { NewMatchPage } from './pages/NewMatchPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { AdminPage } from './pages/AdminPage';
 import { ShopPage } from './pages/ShopPage';
 import { ScoringGuidePage } from './pages/ScoringGuidePage';
 import { SignInPage } from './pages/SignInPage';
@@ -30,6 +31,7 @@ export function App() {
         <Route path="/shop" element={<ShopPage />} />
         <Route path="/scoring-guide" element={<ScoringGuidePage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/admin" element={<AdminPage />} />
       </Route>
     </Routes>
   );
