@@ -1,6 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useSearchParams } from 'react-router-dom';
-import { ThemeToggle } from './ThemeToggle';
 import { NotificationBell } from './NotificationBell';
 import { RankChangeOverlay } from './RankChangeOverlay';
 import { useChatUnread } from '../lib/chat';
@@ -79,7 +78,6 @@ export function AppShell() {
           </h1>
           <div className="flex items-center gap-1">
             <NotificationBell />
-            <ThemeToggle />
           </div>
         </div>
       </header>
