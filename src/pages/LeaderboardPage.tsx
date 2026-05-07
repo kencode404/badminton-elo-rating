@@ -446,6 +446,7 @@ function buildPreviewRows(tab: Tab): Profile[] {
     peak_doubles_rating: isSingles ? 1000 : s.rating,
     created_at: new Date().toISOString(),
     chat_last_seen_at: new Date().toISOString(),
+    notifications_last_seen_at: new Date().toISOString(),
     is_admin: false,
     is_banned: false,
     banned_at: null,

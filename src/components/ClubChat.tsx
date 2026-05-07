@@ -54,6 +54,8 @@ interface ChatMsg {
   streak_count: number | null;
   tier_key: string | null;
   breaker_user_ids: string[] | null;
+  reply_to_message_id: string | null;
+  mentioned_user_ids: string[] | null;
   created_at: string;
   display_name: string;
   avatar_url: string | null;
@@ -97,6 +99,21 @@ export function ClubChat() {
   const [error, setError] = useState<string | null>(null);
   const [pickerForMsg, setPickerForMsg] = useState<string | null>(null);
   const [reactorsForMsg, setReactorsForMsg] = useState<string | null>(null);
+  // Active reply target — set when the user picks Reply from the
+  // long-press menu. Cleared after sending or when the user clicks X.
+  const [replyingTo, setReplyingTo] = useState<ChatMsg | null>(null);
+  // Locally-tracked mentions inserted via the @-dropdown. Stored as
+  // a name → id map; on send, we walk the input looking for each
+  // recorded `@DisplayName` substring and emit the matching ids.
+  const [mentionTargets, setMentionTargets] = useState<
+    Array<{ id: string; display_name: string }>
+  >([]);
+  // Mention-search dropdown state.
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionResults, setMentionResults] = useState<
+    Array<{ id: string; display_name: string; avatar_url: string | null }>
+  >([]);
 
   // Snapshot of the user's last-seen timestamp BEFORE this visit, used
   // once on first render so we can scroll to where they left off.
@@ -115,7 +132,7 @@ export function ClubChat() {
       const { data, error } = await supabase
         .from('chat_messages')
         .select(
-          'id, kind, user_id, body, match_type, streak_count, tier_key, breaker_user_ids, created_at, profiles:user_id(display_name, avatar_url)',
+          'id, kind, user_id, body, match_type, streak_count, tier_key, breaker_user_ids, reply_to_message_id, mentioned_user_ids, created_at, profiles:user_id(display_name, avatar_url)',
         )
         .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
         .order('created_at', { ascending: false })
@@ -140,6 +157,8 @@ export function ClubChat() {
           streak_count: r.streak_count,
           tier_key: r.tier_key ?? null,
           breaker_user_ids: r.breaker_user_ids ?? null,
+          reply_to_message_id: r.reply_to_message_id ?? null,
+          mentioned_user_ids: r.mentioned_user_ids ?? null,
           created_at: r.created_at,
           display_name: r.profiles?.display_name ?? 'Player',
           avatar_url: r.profiles?.avatar_url ?? null,
@@ -346,12 +365,20 @@ export function ClubChat() {
       if (!user) return;
       const body = input.trim();
       if (!body) return;
+      // Filter mentionTargets down to those still present in the body.
+      // Walking each substring catches the case where the user typed
+      // @Name, then deleted it before sending.
+      const mentions = mentionTargets
+        .filter((m) => body.includes(`@${m.display_name}`))
+        .map((m) => m.id);
       setSending(true);
       setError(null);
       const { error } = await supabase.from('chat_messages').insert({
         kind: 'user',
         user_id: user.id,
         body,
+        reply_to_message_id: replyingTo?.id ?? null,
+        mentioned_user_ids: mentions.length > 0 ? mentions : null,
       });
       setSending(false);
       if (error) {
@@ -359,9 +386,112 @@ export function ClubChat() {
         return;
       }
       setInput('');
+      setReplyingTo(null);
+      setMentionTargets([]);
+      setMentionQuery(null);
+      setMentionResults([]);
     },
-    [input, user],
+    [input, user, replyingTo, mentionTargets],
   );
+
+  // Detect when the user is typing an @ mention. The query is the
+  // word immediately following the most-recent @ that's preceded by
+  // whitespace or start-of-string.
+  const onInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInput(value);
+
+    const cursor = e.target.selectionStart ?? value.length;
+    const before = value.slice(0, cursor);
+    const lastAt = before.lastIndexOf('@');
+    if (lastAt < 0) {
+      setMentionQuery(null);
+      return;
+    }
+    const charBeforeAt = lastAt > 0 ? value[lastAt - 1] : ' ';
+    if (lastAt > 0 && !/\s/.test(charBeforeAt)) {
+      setMentionQuery(null);
+      return;
+    }
+    const afterAt = before.slice(lastAt + 1);
+    if (/\s/.test(afterAt)) {
+      setMentionQuery(null);
+      return;
+    }
+    setMentionQuery(afterAt);
+  }, []);
+
+  // Debounced player search for the mention dropdown.
+  useEffect(() => {
+    if (mentionQuery === null) {
+      setMentionResults([]);
+      return;
+    }
+    let active = true;
+    const trimmed = mentionQuery.trim();
+    const t = window.setTimeout(async () => {
+      let q = supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .eq('is_banned', false)
+        .order('display_name', { ascending: true })
+        .limit(8);
+      if (trimmed.length > 0) q = q.ilike('display_name', `${trimmed}%`);
+      const { data } = await q;
+      if (active) {
+        setMentionResults(
+          (data ?? []) as Array<{
+            id: string;
+            display_name: string;
+            avatar_url: string | null;
+          }>,
+        );
+      }
+    }, 150);
+    return () => {
+      active = false;
+      window.clearTimeout(t);
+    };
+  }, [mentionQuery]);
+
+  // Replace the half-typed @<query> in the input with @DisplayName +
+  // a trailing space, and remember the user_id so we can stamp it on
+  // the message at send time.
+  const selectMention = useCallback(
+    (target: { id: string; display_name: string }) => {
+      const inputEl = inputRef.current;
+      if (!inputEl) return;
+      const cursor = inputEl.selectionStart ?? input.length;
+      const before = input.slice(0, cursor);
+      const after = input.slice(cursor);
+      const lastAt = before.lastIndexOf('@');
+      if (lastAt < 0) return;
+      const newBefore = before.slice(0, lastAt) + `@${target.display_name} `;
+      const next = newBefore + after;
+      setInput(next);
+      setMentionTargets((prev) =>
+        prev.some((p) => p.id === target.id)
+          ? prev
+          : [...prev, { id: target.id, display_name: target.display_name }],
+      );
+      setMentionQuery(null);
+      setMentionResults([]);
+      // Restore caret position to just after the inserted name.
+      window.setTimeout(() => {
+        inputEl.focus();
+        const pos = newBefore.length;
+        inputEl.setSelectionRange(pos, pos);
+      }, 0);
+    },
+    [input],
+  );
+
+  // Map of message id → message for fast reply-parent lookup.
+  const messagesById = useMemo(() => {
+    const map = new Map<string, ChatMsg>();
+    if (messages) for (const m of messages) map.set(m.id, m);
+    return map;
+  }, [messages]);
 
   const unsendMessage = useCallback(
     async (messageId: string) => {
@@ -445,6 +575,11 @@ export function ClubChat() {
               reactions={reactionsByMessage.get(m.id) ?? new Map()}
               currentUserId={user?.id ?? null}
               breakerNames={effectiveBreakerNames}
+              parentMessage={
+                m.reply_to_message_id
+                  ? messagesById.get(m.reply_to_message_id) ?? null
+                  : null
+              }
               pickerOpen={pickerForMsg === m.id}
               reactorsOpen={reactorsForMsg === m.id}
               onTogglePicker={() => {
@@ -457,6 +592,12 @@ export function ClubChat() {
               }}
               onToggleReaction={(emoji) => toggleReaction(m.id, emoji)}
               onUnsend={() => unsendMessage(m.id)}
+              onReply={() => {
+                setReplyingTo(m);
+                setPickerForMsg(null);
+                setReactorsForMsg(null);
+                inputRef.current?.focus();
+              }}
             />
           ))
         )}
@@ -468,29 +609,118 @@ export function ClubChat() {
         </div>
       )}
 
-      <form
-        onSubmit={onSend}
-        className="border-t border-zinc-200/60 dark:border-zinc-800/60 px-3 py-2 flex items-center gap-2"
-      >
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          maxLength={500}
-          placeholder="Message the club…"
-          className="flex-1 px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-cyan2-400 focus:ring-1 focus:ring-cyan2-400/40 transition"
-          disabled={sending}
-        />
-        <button
-          type="submit"
-          disabled={sending || !input.trim()}
-          className="cosmic-button text-xs px-4 py-2 disabled:opacity-50"
+      <div className="border-t border-zinc-200/60 dark:border-zinc-800/60">
+        {replyingTo && (
+          <div className="px-3 pt-2">
+            <div className="flex items-center gap-2 rounded-md border-l-2 border-cyan2-400 bg-cyan2-500/5 px-2 py-1.5">
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] font-display uppercase tracking-widest text-cyan2-500 dark:text-cyan2-300">
+                  Replying to {replyingTo.display_name}
+                </div>
+                <div className="text-xs text-zinc-700 dark:text-zinc-300 truncate">
+                  {replyPreviewText(replyingTo)}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyingTo(null)}
+                aria-label="Cancel reply"
+                className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 text-xs px-1"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
+        {mentionQuery !== null && mentionResults.length > 0 && (
+          <div className="px-3 pt-2">
+            <ul className="rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 divide-y divide-zinc-200 dark:divide-zinc-800 max-h-48 overflow-y-auto">
+              {mentionResults.map((r) => (
+                <li key={r.id}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault(); // keep input focus
+                      selectMention({ id: r.id, display_name: r.display_name });
+                    }}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-cyan2-50 dark:hover:bg-cyan2-500/10 transition text-left"
+                  >
+                    {r.avatar_url ? (
+                      <img
+                        src={r.avatar_url}
+                        alt=""
+                        className="w-6 h-6 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-[10px] text-zinc-700 dark:text-zinc-300 font-semibold">
+                        {r.display_name?.[0]?.toUpperCase() ?? '?'}
+                      </span>
+                    )}
+                    <span className="text-sm text-zinc-900 dark:text-zinc-100 truncate">
+                      @{r.display_name}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <form
+          onSubmit={onSend}
+          className="px-3 py-2 flex items-center gap-2"
         >
-          Send
-        </button>
-      </form>
+          <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={onInputChange}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && replyingTo) {
+                setReplyingTo(null);
+                e.preventDefault();
+              }
+            }}
+            maxLength={500}
+            placeholder={
+              replyingTo
+                ? `Reply to ${replyingTo.display_name}…`
+                : 'Message the club… (type @ to mention)'
+            }
+            className="flex-1 px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-cyan2-400 focus:ring-1 focus:ring-cyan2-400/40 transition"
+            disabled={sending}
+          />
+          <button
+            type="submit"
+            disabled={sending || !input.trim()}
+            className="cosmic-button text-xs px-4 py-2 disabled:opacity-50"
+          >
+            Send
+          </button>
+        </form>
+      </div>
     </section>
   );
+}
+
+// Compact preview text used inside the reply strip / inside a reply
+// bubble's pinned parent preview. Matches the system bubbles' tone.
+function replyPreviewText(msg: ChatMsg): string {
+  if (msg.kind === 'user') return msg.body ?? '';
+  if (msg.kind === 'system_streak') {
+    return `${msg.display_name} · ${msg.streak_count} ${msg.match_type} wins in a row`;
+  }
+  if (msg.kind === 'system_tier_up') {
+    return `${msg.display_name} reached ${msg.tier_key}`;
+  }
+  if (msg.kind === 'system_streak_ended') {
+    return `${msg.display_name}'s ${msg.streak_count}-win streak ended`;
+  }
+  if (msg.kind === 'system_season_reset' || msg.kind === 'system_user_banned') {
+    return msg.body ?? '';
+  }
+  return '';
 }
 
 interface RowProps {
@@ -499,12 +729,14 @@ interface RowProps {
   reactions: Map<string, Reaction[]>;
   currentUserId: string | null;
   breakerNames: Record<string, string>;
+  parentMessage: ChatMsg | null;
   pickerOpen: boolean;
   reactorsOpen: boolean;
   onTogglePicker: () => void;
   onShowReactors: () => void;
   onToggleReaction: (emoji: string) => void;
   onUnsend: () => void;
+  onReply: () => void;
 }
 
 function MessageRow(props: RowProps) {
@@ -763,6 +995,8 @@ function buildPreviewAnnouncements(): ChatMsg[] {
       streak_count: null,
       tier_key: 'bronze',
       breaker_user_ids: null,
+      reply_to_message_id: null,
+      mentioned_user_ids: null,
       created_at: ago(2),
       display_name: 'Alice',
       avatar_url: null,
@@ -776,6 +1010,8 @@ function buildPreviewAnnouncements(): ChatMsg[] {
       streak_count: null,
       tier_key: 'silver',
       breaker_user_ids: null,
+      reply_to_message_id: null,
+      mentioned_user_ids: null,
       created_at: ago(3),
       display_name: 'Bob',
       avatar_url: null,
@@ -789,6 +1025,8 @@ function buildPreviewAnnouncements(): ChatMsg[] {
       streak_count: null,
       tier_key: 'gold',
       breaker_user_ids: null,
+      reply_to_message_id: null,
+      mentioned_user_ids: null,
       created_at: ago(5),
       display_name: 'Carol',
       avatar_url: null,
@@ -802,6 +1040,8 @@ function buildPreviewAnnouncements(): ChatMsg[] {
       streak_count: null,
       tier_key: 'diamond',
       breaker_user_ids: null,
+      reply_to_message_id: null,
+      mentioned_user_ids: null,
       created_at: ago(8),
       display_name: 'Dave',
       avatar_url: null,
@@ -815,6 +1055,8 @@ function buildPreviewAnnouncements(): ChatMsg[] {
       streak_count: null,
       tier_key: 'predator',
       breaker_user_ids: null,
+      reply_to_message_id: null,
+      mentioned_user_ids: null,
       created_at: ago(12),
       display_name: 'Erin',
       avatar_url: null,
@@ -828,6 +1070,8 @@ function buildPreviewAnnouncements(): ChatMsg[] {
       streak_count: 4,
       tier_key: null,
       breaker_user_ids: ['preview-breaker-1'],
+      reply_to_message_id: null,
+      mentioned_user_ids: null,
       created_at: ago(20),
       display_name: 'Frank',
       avatar_url: null,
@@ -841,6 +1085,8 @@ function buildPreviewAnnouncements(): ChatMsg[] {
       streak_count: 6,
       tier_key: null,
       breaker_user_ids: ['preview-breaker-1', 'preview-breaker-2'],
+      reply_to_message_id: null,
+      mentioned_user_ids: null,
       created_at: ago(30),
       display_name: 'Gina',
       avatar_url: null,
@@ -854,6 +1100,8 @@ function buildPreviewAnnouncements(): ChatMsg[] {
       streak_count: null,
       tier_key: null,
       breaker_user_ids: null,
+      reply_to_message_id: null,
+      mentioned_user_ids: null,
       created_at: ago(45),
       display_name: 'Hank',
       avatar_url: null,
@@ -867,6 +1115,8 @@ function buildPreviewAnnouncements(): ChatMsg[] {
       streak_count: null,
       tier_key: null,
       breaker_user_ids: null,
+      reply_to_message_id: null,
+      mentioned_user_ids: null,
       created_at: ago(60),
       display_name: 'Boss Ken',
       avatar_url: null,
@@ -889,12 +1139,14 @@ function UserMessageRow({
   isMine,
   reactions,
   currentUserId,
+  parentMessage,
   pickerOpen,
   reactorsOpen,
   onTogglePicker,
   onShowReactors,
   onToggleReaction,
   onUnsend,
+  onReply,
 }: RowProps) {
   const align = isMine ? 'justify-end' : 'justify-start';
   const bubbleClass = isMine
@@ -906,6 +1158,20 @@ function UserMessageRow({
   const bubbleRef = useRef<HTMLDivElement>(null);
   const pillRef = useRef<HTMLDivElement>(null);
   const longPress = useLongPress(onTogglePicker);
+
+  function scrollToParent() {
+    if (!parentMessage) return;
+    const target = document.querySelector(
+      `[data-msg-id="${parentMessage.id}"]`,
+    ) as HTMLElement | null;
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target.classList.add('ring-1', 'ring-cyan2-400');
+      window.setTimeout(() => {
+        target.classList.remove('ring-1', 'ring-cyan2-400');
+      }, 1200);
+    }
+  }
 
   return (
     <div className={`flex ${align}`} data-msg-id={msg.id}>
@@ -921,7 +1187,21 @@ function UserMessageRow({
           {...longPress}
           className={`px-3 py-1.5 text-[13px] leading-snug select-none cursor-pointer ${bubbleClass}`}
         >
-          {msg.body}
+          {parentMessage && (
+            <button
+              type="button"
+              onClick={scrollToParent}
+              className="block w-full text-left mb-1 rounded border-l-2 border-cyan2-400 bg-cyan2-500/10 px-2 py-1 hover:bg-cyan2-500/20 transition"
+            >
+              <div className="text-[9px] font-display uppercase tracking-widest text-cyan2-600 dark:text-cyan2-300">
+                {parentMessage.display_name}
+              </div>
+              <div className="text-[11px] text-zinc-700 dark:text-zinc-300 truncate leading-snug">
+                {replyPreviewText(parentMessage)}
+              </div>
+            </button>
+          )}
+          <MentionAwareBody body={msg.body ?? ''} currentUserId={currentUserId} />
         </div>
         {pickerOpen && (
           <ReactionPicker
@@ -931,6 +1211,7 @@ function UserMessageRow({
             onPick={onToggleReaction}
             canUnsend={isMine && Date.now() - new Date(msg.created_at).getTime() < UNSEND_WINDOW_MS}
             onUnsend={onUnsend}
+            onReply={onReply}
           />
         )}
         <ReactionsBar
@@ -1142,6 +1423,7 @@ function ReactionPicker({
   onPick,
   canUnsend = false,
   onUnsend,
+  onReply,
 }: {
   anchorRef: React.RefObject<HTMLElement | null>;
   alignRight: boolean;
@@ -1149,6 +1431,7 @@ function ReactionPicker({
   onPick: (emoji: string) => void;
   canUnsend?: boolean;
   onUnsend?: () => void;
+  onReply?: () => void;
 }) {
   const PICKER_HEIGHT = 48;
   const PICKER_WIDTH_EST = 360;
@@ -1216,6 +1499,23 @@ function ReactionPicker({
           </button>
         );
       })}
+      {onReply && (
+        <>
+          <span className="w-px self-stretch my-1 bg-zinc-200 dark:bg-zinc-700" aria-hidden />
+          <button
+            type="button"
+            onClick={onReply}
+            className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-cyan2-500/15 transition text-zinc-500 dark:text-zinc-400 hover:text-cyan2-500"
+            aria-label="Reply to message"
+            title="Reply"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M9 17 4 12l5-5" />
+              <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+            </svg>
+          </button>
+        </>
+      )}
       {canUnsend && onUnsend && (
         <>
           <span className="w-px self-stretch my-1 bg-zinc-200 dark:bg-zinc-700" aria-hidden />
@@ -1235,6 +1535,40 @@ function ReactionPicker({
         </>
       )}
     </div>
+  );
+}
+
+// Renders the message body with @Name substrings highlighted in cyan.
+// The list of valid mention names is the message's mentioned_user_ids
+// turned into display names — but since the body already contains the
+// names verbatim (we stamped them at send time), we just look for any
+// "@Word" substring and color it.
+function MentionAwareBody({
+  body,
+  currentUserId,
+}: {
+  body: string;
+  currentUserId: string | null;
+}) {
+  void currentUserId; // reserved for future "highlight self differently"
+  if (!body) return null;
+  // Split by @Word boundaries while preserving the @Word tokens.
+  const parts = body.split(/(@[\p{L}0-9_]+)/gu);
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.startsWith('@') ? (
+          <span
+            key={i}
+            className="text-cyan2-500 dark:text-cyan2-300 font-medium"
+          >
+            {part}
+          </span>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
   );
 }
 

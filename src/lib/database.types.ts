@@ -29,6 +29,7 @@ export interface Database {
           peak_doubles_rating: number;
           created_at: string;
           chat_last_seen_at: string;
+          notifications_last_seen_at: string;
           is_admin: boolean;
           is_banned: boolean;
           banned_at: string | null;
@@ -46,6 +47,7 @@ export interface Database {
           peak_singles_rating?: number;
           peak_doubles_rating?: number;
           chat_last_seen_at?: string;
+          notifications_last_seen_at?: string;
           is_admin?: boolean;
           is_banned?: boolean;
           banned_at?: string | null;
@@ -62,6 +64,7 @@ export interface Database {
           peak_singles_rating?: number;
           peak_doubles_rating?: number;
           chat_last_seen_at?: string;
+          notifications_last_seen_at?: string;
           is_admin?: boolean;
           is_banned?: boolean;
           banned_at?: string | null;
@@ -144,6 +147,8 @@ export interface Database {
           streak_count: number | null;
           tier_key: string | null;
           breaker_user_ids: string[] | null;
+          reply_to_message_id: string | null;
+          mentioned_user_ids: string[] | null;
           created_at: string;
           expires_at: string | null;
         };
@@ -156,6 +161,8 @@ export interface Database {
           streak_count?: number | null;
           tier_key?: string | null;
           breaker_user_ids?: string[] | null;
+          reply_to_message_id?: string | null;
+          mentioned_user_ids?: string[] | null;
           created_at?: string;
           expires_at?: string | null;
         };

@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { getPendingForUser, type PendingMatchSummary } from '../lib/matches';
+import {
+  fetchChatNotifications,
+  markNotificationsSeen,
+  type ChatNotification,
+} from '../lib/notifications';
 import { formatError } from '../lib/errors';
 
 // Notification bell.
@@ -14,14 +19,18 @@ export function NotificationBell() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [count, setCount] = useState(0);
+  const [matchCount, setMatchCount] = useState(0);
+  const [chatCount, setChatCount] = useState(0);
+  const count = matchCount + chatCount;
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<PendingMatchSummary[] | null>(null);
+  const [chatItems, setChatItems] = useState<ChatNotification[] | null>(null);
+  const [lastSeenIso, setLastSeenIso] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Live count via realtime
+  // Live match invitation count via realtime
   useEffect(() => {
     if (!user) return;
     let active = true;
@@ -37,7 +46,7 @@ export function NotificationBell() {
         .eq('user_id', user!.id)
         .eq('confirmation', 'pending')
         .eq('matches.status', 'pending');
-      if (active) setCount(count ?? 0);
+      if (active) setMatchCount(count ?? 0);
     }
 
     refresh();
@@ -64,11 +73,55 @@ export function NotificationBell() {
     };
   }, [user]);
 
+  // Live chat notification count: refresh once on mount + every time
+  // chat_messages or chat_reactions change. Cheap because we read the
+  // user's notifications_last_seen_at and just count the streams.
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+
+    async function refresh() {
+      // Pull last-seen cutoff fresh each time so a stamp from a
+      // sibling tab is reflected.
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('notifications_last_seen_at')
+        .eq('id', user!.id)
+        .maybeSingle();
+      const since = profile?.notifications_last_seen_at ?? '1970-01-01';
+      if (active) setLastSeenIso(since);
+      const list = await fetchChatNotifications(user!.id, since);
+      if (active) setChatCount(list.length);
+    }
+
+    refresh();
+
+    const channel = supabase
+      .channel(`bell-chat-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chat_messages' },
+        () => refresh(),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chat_reactions' },
+        () => refresh(),
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   // Fetch the actual notification list when the popover opens
   useEffect(() => {
     if (!open || !user) return;
     let active = true;
     setItems(null);
+    setChatItems(null);
     setError(null);
     getPendingForUser(user.id)
       .then((list) => {
@@ -77,10 +130,28 @@ export function NotificationBell() {
       .catch((err) => {
         if (active) setError(formatError(err));
       });
+    fetchChatNotifications(user.id, lastSeenIso ?? '1970-01-01')
+      .then((list) => {
+        if (active) setChatItems(list);
+      })
+      .catch(() => {
+        if (active) setChatItems([]);
+      });
     return () => {
       active = false;
     };
-  }, [open, user]);
+  }, [open, user, lastSeenIso]);
+
+  // When the popover closes (or unmounts), stamp notifications-seen so
+  // the badge clears for future events.
+  useEffect(() => {
+    if (open || !user) return;
+    if (chatCount === 0) return;
+    markNotificationsSeen(user.id).then(() => {
+      setLastSeenIso(new Date().toISOString());
+      setChatCount(0);
+    });
+  }, [open, user, chatCount]);
 
   // Close on outside click / Escape
   useEffect(() => {
@@ -142,11 +213,38 @@ export function NotificationBell() {
             {error && (
               <div className="p-3 text-xs text-red-500 dark:text-red-400">{error}</div>
             )}
+
+            {/* Match invitations */}
             {items === null && !error ? (
               <div className="p-4 text-center text-xs text-zinc-500 dark:text-zinc-500">
                 Loading…
               </div>
-            ) : items && items.length === 0 ? (
+            ) : items && items.length > 0 ? (
+              items.map((m) => (
+                <NotificationItem key={m.match.id} summary={m} onClick={gotoMatchTab} />
+              ))
+            ) : null}
+
+            {/* Chat notifications — separated by a grey label */}
+            {chatItems && chatItems.length > 0 && (
+              <>
+                <div className="px-3 py-1.5 border-t border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50/60 dark:bg-zinc-900/30">
+                  <span className="text-[9px] font-display uppercase tracking-widest text-zinc-500 dark:text-zinc-500">
+                    Chat
+                  </span>
+                </div>
+                {chatItems.map((n) => (
+                  <ChatNotificationItem
+                    key={n.key}
+                    notif={n}
+                    onClick={gotoChatTab}
+                  />
+                ))}
+              </>
+            )}
+
+            {/* Empty state — only when both lists are empty */}
+            {items && items.length === 0 && chatItems && chatItems.length === 0 && (
               <div className="px-3 py-6 text-center">
                 <div className="text-2xl mb-2 text-zinc-300 dark:text-zinc-700" aria-hidden>
                   ◇
@@ -155,10 +253,6 @@ export function NotificationBell() {
                   You're all caught up.
                 </div>
               </div>
-            ) : (
-              items?.map((m) => (
-                <NotificationItem key={m.match.id} summary={m} onClick={gotoMatchTab} />
-              ))
             )}
           </div>
 
@@ -174,6 +268,45 @@ export function NotificationBell() {
         </div>
       )}
     </div>
+  );
+
+  function gotoChatTab() {
+    setOpen(false);
+    navigate('/');
+  }
+}
+
+function ChatNotificationItem({
+  notif,
+  onClick,
+}: {
+  notif: ChatNotification;
+  onClick: () => void;
+}) {
+  const verb =
+    notif.kind === 'mention'
+      ? 'mentioned you'
+      : notif.kind === 'reply'
+        ? 'replied to you'
+        : `reacted ${notif.emoji ?? ''}`;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left px-3 py-2.5 border-b border-zinc-200/60 dark:border-zinc-800/60 last:border-b-0 hover:bg-cyan2-50 dark:hover:bg-cyan2-500/10 transition"
+    >
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[10px] font-display uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+          {notif.actor_name} {verb}
+        </span>
+        <span className="text-[10px] text-zinc-500 dark:text-zinc-500">
+          {formatRelative(notif.created_at)}
+        </span>
+      </div>
+      <div className="text-xs text-zinc-700 dark:text-zinc-300 truncate">
+        {notif.preview || '—'}
+      </div>
+    </button>
   );
 }
 

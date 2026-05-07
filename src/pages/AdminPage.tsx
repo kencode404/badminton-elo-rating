@@ -243,6 +243,7 @@ function BanUserCard({ adminId }: { adminId: string }) {
         .select('id, display_name, avatar_url, is_admin, is_banned, banned_at, banned_reason')
         .ilike('display_name', `%${trimmed}%`)
         .eq('is_banned', false)
+        .eq('is_admin', false)
         .neq('id', adminId)
         .order('display_name')
         .limit(20);
