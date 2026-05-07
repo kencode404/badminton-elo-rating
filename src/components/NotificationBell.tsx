@@ -142,10 +142,19 @@ export function NotificationBell() {
     };
   }, [open, user, lastSeenIso]);
 
-  // When the popover closes (or unmounts), stamp notifications-seen so
-  // the badge clears for future events.
+  // Mark notifications seen only on the open→closed transition.
+  // (The previous version fired on any state change while the bell
+  // was closed, including the initial chatCount fetch — which made
+  // notifications silently clear without the user opening the bell.)
+  const wasOpenRef = useRef(false);
   useEffect(() => {
-    if (open || !user) return;
+    if (open) {
+      wasOpenRef.current = true;
+      return;
+    }
+    if (!wasOpenRef.current) return;
+    wasOpenRef.current = false;
+    if (!user) return;
     if (chatCount === 0) return;
     markNotificationsSeen(user.id).then(() => {
       setLastSeenIso(new Date().toISOString());
