@@ -1,8 +1,11 @@
-import type { ReactNode } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { useMemo, useState, type ReactNode } from 'react';
+import { NavLink, Outlet, useSearchParams } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
 import { NotificationBell } from './NotificationBell';
+import { RankChangeOverlay } from './RankChangeOverlay';
 import { useChatUnread } from '../lib/chat';
+import { useRankDemote } from '../lib/rank';
+import { TIERS, type TierKey } from '../lib/tiers';
 
 interface NavItem {
   to: string;
@@ -25,6 +28,30 @@ export function AppShell() {
   // FlatTab would create multiple Realtime channels with the same name
   // and Supabase rejects the duplicate subscriptions.
   const chatUnread = useChatUnread();
+
+  // Live tier-demotion watcher. Fires the overlay when the player's
+  // own rating drops into a lower tier — both via a fresh profile
+  // fetch on mount (catches offline cases) and a realtime subscription
+  // on this user's profiles row (instant when settle_match runs while
+  // the app is open). Promotions stay silent here — those are
+  // celebrated publicly through the system_tier_up chat announcement.
+  const { demote, dismiss: dismissDemote } = useRankDemote();
+
+  // ?preview=rankup-{tier} or ?preview=rankdown-{tier} — fires the
+  // rank-change overlay so the animation can be inspected. The user
+  // can dismiss with the OK button; refresh the page to replay.
+  const [searchParams] = useSearchParams();
+  const rankPreview = useMemo(() => {
+    const param = searchParams.get('preview');
+    if (!param) return null;
+    const m = param.match(/^rank(up|down)-(\w+)$/);
+    if (!m) return null;
+    const direction = m[1] as 'up' | 'down';
+    const tier = TIERS.find((t) => t.key === (m[2] as TierKey));
+    if (!tier) return null;
+    return { direction, tier };
+  }, [searchParams]);
+  const [rankPreviewClosed, setRankPreviewClosed] = useState(false);
 
   return (
     <div className="min-h-dvh flex flex-col cosmic-bg starfield">
@@ -70,6 +97,22 @@ export function AppShell() {
           zIndex: 5,
         }}
       />
+
+      {rankPreview && !rankPreviewClosed && (
+        <RankChangeOverlay
+          direction={rankPreview.direction}
+          tier={rankPreview.tier}
+          onDismiss={() => setRankPreviewClosed(true)}
+        />
+      )}
+
+      {!rankPreview && demote && (
+        <RankChangeOverlay
+          direction="down"
+          tier={demote.tier}
+          onDismiss={dismissDemote}
+        />
+      )}
 
       <nav
         className="fixed inset-x-3 grid grid-cols-5 glass-panel z-10"

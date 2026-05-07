@@ -111,6 +111,36 @@ Past-season cards display final rank (not raw rating):
 
 ---
 
+## `?preview=rankup-{tier}` / `?preview=rankdown-{tier}` — Rank-change overlay
+
+**URLs (any path under AppShell):**
+- `/?preview=rankup-bronze` … `/?preview=rankup-predator`
+- `/?preview=rankdown-bronze` … `/?preview=rankdown-predator`
+
+**Source:** [src/components/RankChangeOverlay.tsx](../src/components/RankChangeOverlay.tsx),
+detection in [src/components/AppShell.tsx](../src/components/AppShell.tsx)
+
+Fires the full-screen tier-change celebration: dark backdrop, huge
+TierBadge floating in the center with rise (up) or fall (down)
+animation, tier-colored sparks for promotions, the tier name in
+giant display type, and an OK button to return to the app. Refresh
+the page to replay the animation from scratch.
+
+| Direction       | Header     | Halo behavior                    |
+| --------------- | ---------- | -------------------------------- |
+| `rankup-{tier}` | RANK UP!   | Tier-color glow + 16 sparks      |
+| `rankdown-{tier}`| RANK DOWN | Desaturated dim pulse, no sparks |
+
+Suggested QA URLs (cover everything in two refreshes):
+- `/?preview=rankup-gold`
+- `/?preview=rankdown-gold`
+
+Same overlay component is used for the real triggering flow (TBD —
+will fire when a system_tier_up message is received for the current
+user, or a future `system_demote` message is added).
+
+---
+
 ## Adding a new preview mode
 
 1. Pick a query param key (e.g. `?preview=newthing`) and read it via

@@ -96,6 +96,69 @@
   }
 }
 
+/* Rank-change full-screen overlay — used by RankChangeOverlay. */
+@keyframes rank-up-icon-rise {
+  0% {
+    transform: translate3d(0, 80px, 0) scale(0.2);
+    opacity: 0;
+  }
+  60% {
+    transform: translate3d(0, -12px, 0) scale(1.18);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes rank-down-icon-fall {
+  0% {
+    transform: translate3d(0, -80px, 0) scale(1.25);
+    opacity: 0;
+    filter: brightness(1.6);
+  }
+  55% {
+    transform: translate3d(0, 14px, 0) scale(0.92);
+    opacity: 1;
+    filter: brightness(0.7);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 1;
+    filter: brightness(0.85);
+  }
+}
+
+@keyframes rank-glow-pulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.08); }
+}
+
+@keyframes rank-down-dim-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(1); }
+  50%      { opacity: 0.7;  transform: scale(1.04); }
+}
+
+@keyframes rank-text-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes rank-spark-burst {
+  0% {
+    transform: rotate(var(--spark-rotate)) translateY(-30px);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(var(--spark-rotate)) translateY(var(--spark-end));
+    opacity: 0;
+  }
+}
+
 /* Diamond+ row sweep — a translucent band that travels left to right
    periodically. The band is contained in an overflow-hidden wrapper
    inside the row so streak-burst sparks (which sit on the avatar)
