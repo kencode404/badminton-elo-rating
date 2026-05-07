@@ -166,17 +166,19 @@ export function ClubChat() {
         .reverse(); // oldest first → newest at bottom
       setMessages(flattened);
 
-      // Fetch display names for breakers referenced in any
-      // system_streak_ended message in this batch.
-      const breakerIds = new Set<string>();
+      // Fetch display names for any user_ids referenced in this
+      // batch's breaker_user_ids OR mentioned_user_ids — both end up
+      // in the same name lookup map keyed by id.
+      const idsToResolve = new Set<string>();
       for (const m of flattened) {
-        if (m.breaker_user_ids) for (const id of m.breaker_user_ids) breakerIds.add(id);
+        if (m.breaker_user_ids) for (const id of m.breaker_user_ids) idsToResolve.add(id);
+        if (m.mentioned_user_ids) for (const id of m.mentioned_user_ids) idsToResolve.add(id);
       }
-      if (breakerIds.size > 0) {
+      if (idsToResolve.size > 0) {
         const { data: profs } = await supabase
           .from('profiles')
           .select('id, display_name')
-          .in('id', Array.from(breakerIds));
+          .in('id', Array.from(idsToResolve));
         if (active && profs) {
           setBreakerNames((prev) => {
             const next = { ...prev };
@@ -575,6 +577,11 @@ export function ClubChat() {
               reactions={reactionsByMessage.get(m.id) ?? new Map()}
               currentUserId={user?.id ?? null}
               breakerNames={effectiveBreakerNames}
+              mentionNames={
+                (m.mentioned_user_ids ?? [])
+                  .map((id) => effectiveBreakerNames[id])
+                  .filter((n): n is string => Boolean(n))
+              }
               parentMessage={
                 m.reply_to_message_id
                   ? messagesById.get(m.reply_to_message_id) ?? null
@@ -729,6 +736,10 @@ interface RowProps {
   reactions: Map<string, Reaction[]>;
   currentUserId: string | null;
   breakerNames: Record<string, string>;
+  // Display names of users mentioned in this specific message,
+  // resolved from mentioned_user_ids. Used by MentionAwareBody to
+  // match `@Name` substrings (works even when names contain spaces).
+  mentionNames: string[];
   parentMessage: ChatMsg | null;
   pickerOpen: boolean;
   reactorsOpen: boolean;
@@ -1139,6 +1150,7 @@ function UserMessageRow({
   isMine,
   reactions,
   currentUserId,
+  mentionNames,
   parentMessage,
   pickerOpen,
   reactorsOpen,
@@ -1201,7 +1213,7 @@ function UserMessageRow({
               </div>
             </button>
           )}
-          <MentionAwareBody body={msg.body ?? ''} currentUserId={currentUserId} />
+          <MentionAwareBody body={msg.body ?? ''} mentionNames={mentionNames} />
         </div>
         {pickerOpen && (
           <ReactionPicker
@@ -1538,34 +1550,50 @@ function ReactionPicker({
   );
 }
 
-// Renders the message body with @Name substrings highlighted in cyan.
-// The list of valid mention names is the message's mentioned_user_ids
-// turned into display names — but since the body already contains the
-// names verbatim (we stamped them at send time), we just look for any
-// "@Word" substring and color it.
+// Renders the message body with @Name substrings highlighted in
+// cyan. mentionNames is the resolved display names for this
+// message's mentioned_user_ids — sorted longest-first so a name
+// like "Boss Ken" matches as a single token even though it contains
+// a space.
 function MentionAwareBody({
   body,
-  currentUserId,
+  mentionNames,
 }: {
   body: string;
-  currentUserId: string | null;
+  mentionNames: string[];
 }) {
-  void currentUserId; // reserved for future "highlight self differently"
   if (!body) return null;
-  // Split by @Word boundaries while preserving the @Word tokens.
-  const parts = body.split(/(@[\p{L}0-9_]+)/gu);
+  const names = [...mentionNames].sort((a, b) => b.length - a.length);
+  const parts: Array<{ text: string; mention: boolean }> = [];
+  let i = 0;
+  while (i < body.length) {
+    if (body[i] === '@') {
+      const remaining = body.slice(i + 1);
+      const matched = names.find((n) => remaining.startsWith(n));
+      if (matched) {
+        parts.push({ text: '@' + matched, mention: true });
+        i += 1 + matched.length;
+        continue;
+      }
+    }
+    // Plain run — accumulate until the next '@' for cheap rendering.
+    const next = body.indexOf('@', i + 1);
+    const end = next === -1 ? body.length : next;
+    parts.push({ text: body.slice(i, end), mention: false });
+    i = end;
+  }
   return (
     <>
-      {parts.map((part, i) =>
-        part.startsWith('@') ? (
+      {parts.map((p, idx) =>
+        p.mention ? (
           <span
-            key={i}
+            key={idx}
             className="text-cyan2-500 dark:text-cyan2-300 font-medium"
           >
-            {part}
+            {p.text}
           </span>
         ) : (
-          <span key={i}>{part}</span>
+          <span key={idx}>{p.text}</span>
         ),
       )}
     </>
