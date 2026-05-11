@@ -93,10 +93,22 @@ export interface CreateMatchInput {
   opponentIds: string[];     // singles: 1 id. doubles: 2 ids.
   scoreA: number;
   scoreB: number;
+  // Optional override — used by the offline flush path so the match
+  // is dated when the player actually recorded it, not when the
+  // queue happened to drain. Omitted → DB default now() applies.
+  playedAt?: string;
 }
 
 export async function createMatch(input: CreateMatchInput): Promise<Match> {
-  const { matchType, creatorId, partnerId, opponentIds, scoreA, scoreB } = input;
+  const {
+    matchType,
+    creatorId,
+    partnerId,
+    opponentIds,
+    scoreA,
+    scoreB,
+    playedAt,
+  } = input;
 
   if (scoreA === scoreB) throw new Error('Scores cannot be tied');
   if (scoreA < 0 || scoreB < 0) throw new Error('Scores cannot be negative');
@@ -118,6 +130,7 @@ export async function createMatch(input: CreateMatchInput): Promise<Match> {
       created_by: creatorId,
       score_a: scoreA,
       score_b: scoreB,
+      ...(playedAt ? { played_at: playedAt } : {}),
     })
     .select()
     .single();
@@ -213,6 +226,10 @@ export async function flushPendingMatches(): Promise<number> {
         opponentIds: q.opponentIds,
         scoreA: q.scoreA,
         scoreB: q.scoreB,
+        // Stamp the original queue-time so the match is dated when
+        // it was actually played, not when the queue happened to
+        // drain. Important: phones can sit offline for hours.
+        playedAt: q.playedAt,
       });
       await deleteQueuedMatch(q.id);
       sent += 1;
