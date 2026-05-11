@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { createMatch } from '../lib/matches';
+import { recordMatchOnlineOrQueue } from '../lib/matches';
 import { PlayerPicker } from '../components/PlayerPicker';
 import type { Database, MatchType } from '../lib/database.types';
 
@@ -56,15 +56,26 @@ export function NewMatchPage() {
 
     setSubmitting(true);
     try {
-      await createMatch({
-        matchType,
-        creatorId: user.id,
-        partnerId: matchType === 'doubles' ? partner[0]?.id : undefined,
-        opponentIds: opponents.map((p) => p.id),
-        scoreA: a,
-        scoreB: b,
-      });
-      navigate('/record', { replace: true });
+      const participantNames = [
+        ...partner.map((p) => p.display_name),
+        ...opponents.map((p) => p.display_name),
+      ];
+      const result = await recordMatchOnlineOrQueue(
+        {
+          matchType,
+          creatorId: user.id,
+          partnerId: matchType === 'doubles' ? partner[0]?.id : undefined,
+          opponentIds: opponents.map((p) => p.id),
+          scoreA: a,
+          scoreB: b,
+        },
+        participantNames,
+      );
+      if (result.kind === 'queued') {
+        navigate('/record?queued=1', { replace: true });
+      } else {
+        navigate('/record', { replace: true });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to record match');
     } finally {

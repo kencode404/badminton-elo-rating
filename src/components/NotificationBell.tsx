@@ -246,7 +246,7 @@ export function NotificationBell() {
                   <ChatNotificationItem
                     key={n.key}
                     notif={n}
-                    onClick={gotoChatTab}
+                    onClick={() => gotoChatTab(n.message_id)}
                   />
                 ))}
               </>
@@ -279,9 +279,9 @@ export function NotificationBell() {
     </div>
   );
 
-  function gotoChatTab() {
+  function gotoChatTab(msgId?: string) {
     setOpen(false);
-    navigate('/');
+    navigate(msgId ? `/?msg=${msgId}` : '/');
   }
 }
 

@@ -1,10 +1,11 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useSearchParams } from 'react-router-dom';
 import { NotificationBell } from './NotificationBell';
 import { RankChangeOverlay } from './RankChangeOverlay';
 import { useChatUnread } from '../lib/chat';
-import { useBanWatcher } from '../lib/auth';
-import { useRankDemote } from '../lib/rank';
+import { useBanWatcher, useAuth } from '../lib/auth';
+import { useRankChange } from '../lib/rank';
+import { flushPendingMatches } from '../lib/matches';
 import { TIERS, type TierKey } from '../lib/tiers';
 
 interface NavItem {
@@ -34,13 +35,26 @@ export function AppShell() {
   // ban message via the post-handshake check in signInWithPassword.
   useBanWatcher();
 
-  // Live tier-demotion watcher. Fires the overlay when the player's
-  // own rating drops into a lower tier — both via a fresh profile
-  // fetch on mount (catches offline cases) and a realtime subscription
-  // on this user's profiles row (instant when settle_match runs while
-  // the app is open). Promotions stay silent here — those are
-  // celebrated publicly through the system_tier_up chat announcement.
-  const { demote, dismiss: dismissDemote } = useRankDemote();
+  // Live rank watcher: fires the full-screen overlay on
+  //   * placement complete (direction='up') — first time games >= 5
+  //   * demote (direction='down') — tier dropped while post-placement
+  // Mid-placement tier crossings stay silent here — those are
+  // suppressed in chat too until placement ends.
+  const { event: rankEvent, dismiss: dismissRankEvent } = useRankChange();
+
+  // Drain any matches queued offline as soon as we have a session +
+  // the network comes back. Cheap on each load — getQueuedMatches
+  // returns an empty array for the common case.
+  const { user } = useAuth();
+  useEffect(() => {
+    if (!user) return;
+    void flushPendingMatches();
+    const onOnline = () => {
+      void flushPendingMatches();
+    };
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [user]);
 
   // ?preview=rankup-{tier} or ?preview=rankdown-{tier} — fires the
   // rank-change overlay so the animation can be inspected. The user
@@ -110,11 +124,11 @@ export function AppShell() {
         />
       )}
 
-      {!rankPreview && demote && (
+      {!rankPreview && rankEvent && (
         <RankChangeOverlay
-          direction="down"
-          tier={demote.tier}
-          onDismiss={dismissDemote}
+          direction={rankEvent.direction}
+          tier={rankEvent.tier}
+          onDismiss={dismissRankEvent}
         />
       )}
 

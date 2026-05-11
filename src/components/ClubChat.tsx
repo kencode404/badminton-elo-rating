@@ -73,6 +73,10 @@ export function ClubChat() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const previewMode = searchParams.get('preview') === 'announcements';
+  // ?msg=<id> — set when the user taps a chat notification in the
+  // bell. We scroll to + flash that message after the list loads.
+  const targetMsgId = searchParams.get('msg');
+  const scrolledToTargetRef = useRef<string | null>(null);
   const [messages, setMessages] = useState<ChatMsg[] | null>(null);
   const [reactions, setReactions] = useState<Reaction[]>([]);
   // Display-name lookup for users referenced in breaker_user_ids on
@@ -317,6 +321,23 @@ export function ClubChat() {
       el.scrollTop = el.scrollHeight;
     }
   }, [messages]);
+
+  // Notification deep-link: when the URL carries ?msg=<id>, scroll the
+  // chat list to that message and briefly ring it. Runs once per id.
+  useEffect(() => {
+    if (!targetMsgId || !messages) return;
+    if (scrolledToTargetRef.current === targetMsgId) return;
+    const target = listRef.current?.querySelector(
+      `[data-msg-id="${targetMsgId}"]`,
+    ) as HTMLElement | null;
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.classList.add('ring-2', 'ring-cyan2-400', 'rounded-md');
+    window.setTimeout(() => {
+      target.classList.remove('ring-2', 'ring-cyan2-400', 'rounded-md');
+    }, 1600);
+    scrolledToTargetRef.current = targetMsgId;
+  }, [targetMsgId, messages]);
 
   // Close any open popover (picker or reactors) on outside tap or Escape.
   useEffect(() => {

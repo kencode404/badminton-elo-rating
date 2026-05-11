@@ -1,4 +1,14 @@
 import { supabase } from './supabase';
+import {
+  cacheRoster,
+  deleteQueuedMatch,
+  getCachedRoster,
+  getQueuedMatches,
+  isOffline,
+  looksLikeNetworkError,
+  queueMatch,
+  type QueuedMatchInput,
+} from './offline';
 import type { Confirmation, Database, MatchType, Team } from './database.types';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -22,24 +32,60 @@ export async function searchPlayers(
   excludeIds: string[] = [],
   limit = 100,
 ): Promise<Pick<Profile, 'id' | 'display_name' | 'avatar_url'>[]> {
-  let q = supabase
-    .from('profiles')
-    .select('id, display_name, avatar_url')
-    .eq('is_banned', false)
-    .order('display_name', { ascending: true })
-    .limit(limit);
-
   const trimmed = query.trim();
-  if (trimmed) {
-    q = q.ilike('display_name', `%${trimmed}%`);
-  }
-  if (excludeIds.length) {
-    q = q.not('id', 'in', `(${excludeIds.join(',')})`);
+
+  async function fromNetwork() {
+    let q = supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url')
+      .eq('is_banned', false)
+      .order('display_name', { ascending: true })
+      .limit(limit);
+    if (trimmed) q = q.ilike('display_name', `%${trimmed}%`);
+    if (excludeIds.length) {
+      q = q.not('id', 'in', `(${excludeIds.join(',')})`);
+    }
+    const { data, error } = await q;
+    if (error) throw error;
+    return data ?? [];
   }
 
-  const { data, error } = await q;
-  if (error) throw error;
-  return data ?? [];
+  function filterCached(
+    rows: Pick<Profile, 'id' | 'display_name' | 'avatar_url'>[],
+  ) {
+    const exclude = new Set(excludeIds);
+    const lower = trimmed.toLowerCase();
+    return rows
+      .filter((p) => !exclude.has(p.id))
+      .filter((p) =>
+        lower ? p.display_name.toLowerCase().includes(lower) : true,
+      )
+      .sort((a, b) => a.display_name.localeCompare(b.display_name))
+      .slice(0, limit);
+  }
+
+  if (isOffline()) {
+    const cached = await getCachedRoster();
+    return filterCached(cached);
+  }
+
+  try {
+    const rows = await fromNetwork();
+    // Mirror the (unfiltered-style) result into the local roster
+    // cache for offline use. We only mirror when the search isn't
+    // narrowed by excludeIds — those exclusions are picker-flow
+    // specific, not roster state.
+    if (excludeIds.length === 0) {
+      void cacheRoster(rows);
+    }
+    return rows;
+  } catch (err) {
+    if (looksLikeNetworkError(err)) {
+      const cached = await getCachedRoster();
+      return filterCached(cached);
+    }
+    throw err;
+  }
 }
 
 export interface CreateMatchInput {
@@ -111,6 +157,79 @@ export async function createMatch(input: CreateMatchInput): Promise<Match> {
   if (ackErr) throw ackErr;
 
   return match;
+}
+
+// Online-aware wrapper for createMatch. If the device is offline (or
+// the network insert fails with what looks like a network error), the
+// payload is persisted to IndexedDB and replayed by
+// flushPendingMatches() when connectivity returns.
+//
+// Returns:
+//   { kind: 'sent', match }    — successfully posted to the server
+//   { kind: 'queued' }         — saved locally; will retry later
+export async function recordMatchOnlineOrQueue(
+  input: CreateMatchInput,
+  participantNames: string[],
+): Promise<{ kind: 'sent'; match: Match } | { kind: 'queued' }> {
+  const queuedPayload: QueuedMatchInput = {
+    type: input.matchType,
+    creatorId: input.creatorId,
+    partnerId: input.partnerId ?? null,
+    opponentIds: input.opponentIds,
+    scoreA: input.scoreA,
+    scoreB: input.scoreB,
+    playedAt: new Date().toISOString(),
+    participantNames,
+    queuedAt: new Date().toISOString(),
+  };
+
+  if (isOffline()) {
+    await queueMatch(queuedPayload);
+    return { kind: 'queued' };
+  }
+  try {
+    const match = await createMatch(input);
+    return { kind: 'sent', match };
+  } catch (err) {
+    if (looksLikeNetworkError(err)) {
+      await queueMatch(queuedPayload);
+      return { kind: 'queued' };
+    }
+    throw err;
+  }
+}
+
+// Replay any matches that were queued offline. Called from AppShell
+// on mount + on the browser 'online' event. Returns the count of
+// matches that successfully flushed.
+export async function flushPendingMatches(): Promise<number> {
+  if (isOffline()) return 0;
+  const queue = await getQueuedMatches();
+  let sent = 0;
+  for (const q of queue) {
+    try {
+      await createMatch({
+        matchType: q.type,
+        creatorId: q.creatorId,
+        partnerId: q.partnerId ?? undefined,
+        opponentIds: q.opponentIds,
+        scoreA: q.scoreA,
+        scoreB: q.scoreB,
+      });
+      await deleteQueuedMatch(q.id);
+      sent += 1;
+    } catch (err) {
+      if (looksLikeNetworkError(err)) {
+        // Connection died mid-flush — leave the rest queued for later.
+        break;
+      }
+      // Permanent failure (RLS, validation, etc.) — drop the row so
+      // it doesn't loop forever. The user lost this submission, but
+      // the alternative is replaying it indefinitely on every load.
+      await deleteQueuedMatch(q.id);
+    }
+  }
+  return sent;
 }
 
 export async function respondToMatch(
