@@ -77,11 +77,6 @@ export function ClubChat() {
   // bell. We scroll to + flash that message after the list loads.
   const targetMsgId = searchParams.get('msg');
   const scrolledToTargetRef = useRef<string | null>(null);
-  // Counts in-flight optimistic reaction writes. While > 0, we skip
-  // the realtime/poll-driven loadReactions() so a fetch that races
-  // ahead of our DB commit can't overwrite the optimistic state with
-  // stale data (the user-visible flicker bug).
-  const inFlightReactionWritesRef = useRef(0);
   const [messages, setMessages] = useState<ChatMsg[] | null>(null);
   const [reactions, setReactions] = useState<Reaction[]>([]);
   // Display-name lookup for users referenced in breaker_user_ids on
@@ -201,10 +196,6 @@ export function ClubChat() {
     }
 
     async function loadReactions() {
-      // Skip the fetch entirely while one of our own optimistic
-      // writes is still in flight — otherwise this can return the
-      // pre-write DB state and overwrite the optimistic update.
-      if (inFlightReactionWritesRef.current > 0) return;
       const { data, error } = await supabase
         .from('chat_reactions')
         .select('message_id, user_id, emoji, profiles:user_id(display_name, avatar_url)');
@@ -212,9 +203,6 @@ export function ClubChat() {
       if (error) {
         return;
       }
-      // One more guard: another write may have started while we were
-      // waiting for the response. Don't apply this stale snapshot.
-      if (inFlightReactionWritesRef.current > 0) return;
       type Joined = {
         message_id: string;
         user_id: string;
@@ -236,6 +224,16 @@ export function ClubChat() {
     loadMessages();
     loadReactions();
 
+    // Patch reactions state directly from the realtime payload —
+    // refetching all reactions on every event was racing with
+    // read-after-write timing on Supabase, causing the optimistic
+    // emoji to flicker back to the previous value before settling.
+    type ReactionPayload = {
+      message_id: string;
+      user_id: string;
+      emoji: string;
+    };
+
     const channel = supabase
       .channel(`club-chat-${user.id}`)
       .on(
@@ -245,8 +243,57 @@ export function ClubChat() {
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'chat_reactions' },
-        () => loadReactions(),
+        { event: 'INSERT', schema: 'public', table: 'chat_reactions' },
+        (payload) => {
+          const r = payload.new as ReactionPayload;
+          setReactions((rs) => {
+            // Reuse display_name/avatar from any existing reaction by
+            // the same user — payload doesn't carry the profile JOIN.
+            const known = rs.find((x) => x.user_id === r.user_id);
+            const without = rs.filter(
+              (x) =>
+                !(x.message_id === r.message_id && x.user_id === r.user_id),
+            );
+            return [
+              ...without,
+              {
+                message_id: r.message_id,
+                user_id: r.user_id,
+                emoji: r.emoji,
+                display_name: known?.display_name ?? 'Player',
+                avatar_url: known?.avatar_url ?? null,
+              },
+            ];
+          });
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'chat_reactions' },
+        (payload) => {
+          const r = payload.new as ReactionPayload;
+          setReactions((rs) =>
+            rs.map((x) =>
+              x.message_id === r.message_id && x.user_id === r.user_id
+                ? { ...x, emoji: r.emoji }
+                : x,
+            ),
+          );
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'chat_reactions' },
+        (payload) => {
+          const r = payload.old as { message_id?: string; user_id?: string };
+          if (!r.message_id || !r.user_id) return;
+          setReactions((rs) =>
+            rs.filter(
+              (x) =>
+                !(x.message_id === r.message_id && x.user_id === r.user_id),
+            ),
+          );
+        },
       )
       .subscribe((status) => {
         // Surface subscription status so we can spot a misconfigured
@@ -256,12 +303,11 @@ export function ClubChat() {
         }
       });
 
-    // Polling fallback — realtime should drive updates instantly, but
-    // poll every 8s as a safety net if events are dropped or the
-    // table isn't in the supabase_realtime publication.
+    // Polling fallback for messages only — reactions are kept in
+    // sync via the realtime patch handlers above, no need to refetch
+    // (the refetch was a race source and caused emoji flicker).
     const poll = window.setInterval(() => {
       loadMessages();
-      loadReactions();
     }, 8000);
 
     return () => {
@@ -619,25 +665,20 @@ export function ClubChat() {
         ]);
       }
 
-      inFlightReactionWritesRef.current += 1;
-      try {
-        const result =
-          mine && mine.emoji === emoji
-            ? await supabase
-                .from('chat_reactions')
-                .delete()
-                .eq('message_id', messageId)
-                .eq('user_id', myUserId)
-            : await supabase.from('chat_reactions').upsert(
-                { message_id: messageId, user_id: myUserId, emoji },
-                { onConflict: 'message_id,user_id' },
-              );
-        if (result.error) {
-          setReactions(prev);
-          setError(formatError(result.error));
-        }
-      } finally {
-        inFlightReactionWritesRef.current -= 1;
+      const result =
+        mine && mine.emoji === emoji
+          ? await supabase
+              .from('chat_reactions')
+              .delete()
+              .eq('message_id', messageId)
+              .eq('user_id', myUserId)
+          : await supabase.from('chat_reactions').upsert(
+              { message_id: messageId, user_id: myUserId, emoji },
+              { onConflict: 'message_id,user_id' },
+            );
+      if (result.error) {
+        setReactions(prev);
+        setError(formatError(result.error));
       }
     },
     [user, reactions],
