@@ -61,11 +61,12 @@ set search_path = public
 as $$
 declare
   v_admin boolean;
+  v_admin_name text;
   v_current_season int;
   v_next_season int;
 begin
   -- Auth: caller must be an admin
-  select is_admin into v_admin
+  select is_admin, display_name into v_admin, v_admin_name
     from public.profiles
    where id = auth.uid();
   if not coalesce(v_admin, false) then
@@ -82,8 +83,7 @@ begin
   -- derived from match_participants for matches confirmed within the
   -- current season window. Ranks are row_number() over the rating
   -- column per mode, restricted to players who actually played that
-  -- mode (so non-players get null rank instead of being lumped at
-  -- the bottom).
+  -- mode AND aren't banned (so banned players get null rank).
   with singles_ranked as (
     select id,
       row_number() over (
@@ -91,6 +91,7 @@ begin
       )::int as rank
       from public.profiles
      where singles_games_played > 0
+       and is_banned = false
   ),
   doubles_ranked as (
     select id,
@@ -99,6 +100,7 @@ begin
       )::int as rank
       from public.profiles
      where doubles_games_played > 0
+       and is_banned = false
   )
   insert into public.season_snapshots
     (user_id, season_number, singles_rating, doubles_rating,
@@ -144,15 +146,16 @@ begin
   insert into public.seasons (number, started_at)
   values (v_next_season, now());
 
-  -- Reset every profile to fresh-start state
+  -- Reset every profile's season-state — including banned users (the
+  -- is_banned flag itself is intentionally left untouched).
   update public.profiles
      set singles_rating = 1000,
          doubles_rating = 1000,
          singles_games_played = 0,
          doubles_games_played = 0;
 
-  -- Clear stale system announcements (they reference last season's
-  -- streaks and tier crossings). User chat is preserved.
+  -- Stale match-derived announcements go; the season-reset moderation
+  -- log line we insert below is kept (it has its own 30-day timer).
   delete from public.chat_messages
    where kind in ('system_streak', 'system_tier_up', 'system_streak_ended');
 
@@ -160,6 +163,17 @@ begin
   -- dropped so the Past Seasons Record list stays focused.
   delete from public.season_snapshots
    where season_number <= v_current_season - 5;
+
+  -- Drop the moderation log line announcing this reset.
+  insert into public.chat_messages
+    (kind, user_id, body, expires_at)
+  values (
+    'system_season_reset',
+    auth.uid(),
+    'Season ' || v_current_season || ' reset by ' ||
+      coalesce(v_admin_name, 'admin'),
+    now() + interval '30 days'
+  );
 
   return v_next_season;
 end;

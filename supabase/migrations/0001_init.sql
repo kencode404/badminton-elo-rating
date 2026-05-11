@@ -64,14 +64,20 @@ create table if not exists public.profiles (
   peak_singles_rating int not null default 1000,
   peak_doubles_rating int not null default 1000,
   created_at timestamptz not null default now(),
-  is_admin boolean not null default false
+  is_admin boolean not null default false,
+  -- Cutoff for the notification-bell badge — chat events newer than
+  -- this count toward the badge until the user opens the popover.
+  notifications_last_seen_at timestamptz not null
+    default '1970-01-01 00:00:00+00'
 );
 
 -- Idempotent column adds for existing prod that pre-dates the column.
 alter table public.profiles
   add column if not exists is_admin boolean not null default false,
   add column if not exists peak_singles_rating int not null default 1000,
-  add column if not exists peak_doubles_rating int not null default 1000;
+  add column if not exists peak_doubles_rating int not null default 1000,
+  add column if not exists notifications_last_seen_at timestamptz not null
+    default '1970-01-01 00:00:00+00';
 
 -- Idempotent backfill: peak >= current rating. Re-running is a no-op
 -- because greatest() is monotonic.

@@ -1,16 +1,21 @@
 -- Club Chat schema: chat_messages (system announcements + user chat),
--- chat_reactions (one per user per message), helpers for the
--- after-match-confirmed trigger that emits three system kinds:
+-- chat_reactions (one per user per message), helpers + the after-
+-- match-confirmed trigger that emits all five system kinds:
 --
 --   * system_streak        — winner is on a >= 2-win streak
---   * system_tier_up       — winner's rating crossed a tier boundary
---                            upward
+--   * system_tier_up       — placement reveal at game 5, OR a tier
+--                            crossing upward post-placement
 --   * system_streak_ended  — loser had a >= 2 win streak that just
 --                            broke; breaker_user_ids names the
 --                            winning side
+--   * system_season_reset  — moderation log line (admin reset season)
+--   * system_user_banned   — moderation log line (admin banned user)
 --
--- Also adds the chat_last_seen_at column on profiles that drives the
--- home-tab unread badge. Safe to rerun.
+-- User chat (kind = 'user') supports replies (reply_to_message_id)
+-- and @mentions (mentioned_user_ids). Adds chat_last_seen_at on
+-- profiles that drives the home-tab unread badge.
+--
+-- Safe to rerun.
 
 -- =========================================================================
 -- 1. profiles.chat_last_seen_at
@@ -21,8 +26,9 @@ alter table public.profiles
     default '1970-01-01 00:00:00+00';
 
 -- =========================================================================
--- 2. Enum (all four message kinds from creation — fresh installs and
---    existing prod that already has the enum both end up consistent)
+-- 2. Enum (all six message kinds from creation — fresh installs are
+--    one-shot; existing prod that already has the enum keeps its
+--    values regardless)
 -- =========================================================================
 
 do $$ begin
@@ -30,6 +36,8 @@ do $$ begin
     'system_streak',
     'system_tier_up',
     'system_streak_ended',
+    'system_season_reset',
+    'system_user_banned',
     'user'
   );
 exception when duplicate_object then null;
@@ -48,6 +56,8 @@ create table if not exists public.chat_messages (
   streak_count int,
   tier_key text,
   breaker_user_ids uuid[],
+  reply_to_message_id uuid references public.chat_messages(id) on delete set null,
+  mentioned_user_ids uuid[],
   created_at timestamptz not null default now(),
   expires_at timestamptz
 );
@@ -55,10 +65,22 @@ create table if not exists public.chat_messages (
 -- Idempotent column adds for existing prod that pre-dates them.
 alter table public.chat_messages
   add column if not exists tier_key text,
-  add column if not exists breaker_user_ids uuid[];
+  add column if not exists breaker_user_ids uuid[],
+  add column if not exists reply_to_message_id uuid
+    references public.chat_messages(id) on delete set null,
+  add column if not exists mentioned_user_ids uuid[];
 
 create index if not exists chat_messages_created_idx
   on public.chat_messages (created_at desc);
+
+create index if not exists chat_messages_reply_to_idx
+  on public.chat_messages (reply_to_message_id)
+  where reply_to_message_id is not null;
+
+-- GIN index — used by the bell-badge query to find messages where
+-- the current user is in mentioned_user_ids.
+create index if not exists chat_messages_mentions_idx
+  on public.chat_messages using gin (mentioned_user_ids);
 
 alter table public.chat_messages
   drop constraint if exists chat_messages_check;
@@ -81,6 +103,14 @@ alter table public.chat_messages
       and streak_count >= 2
       and breaker_user_ids is not null
       and array_length(breaker_user_ids, 1) >= 1)
+    or (kind = 'system_season_reset'
+      and user_id is not null
+      and body is not null
+      and length(trim(body)) > 0)
+    or (kind = 'system_user_banned'
+      and user_id is not null
+      and body is not null
+      and length(trim(body)) > 0)
     or (kind = 'user'
       and user_id is not null
       and body is not null
@@ -204,8 +234,14 @@ end;
 $$;
 
 -- =========================================================================
--- 5. Announcement trigger — emits all three system kinds after a
---    match is confirmed
+-- 5. Announcement trigger — emits all three "match-derived" system
+--    kinds, with placement gating on tier_up.
+--
+-- Placement (games_played < 5 in this mode) → no per-match tier_up.
+-- Exactly at games_played = 5 → emit a single system_tier_up
+-- revealing the player's final placement tier (winner OR loser).
+-- Past placement (games_played > 5) → tier_up only on actual crossing.
+-- Streak announcements are placement-agnostic.
 -- =========================================================================
 
 create or replace function public.refresh_chat_streak_messages()
@@ -222,9 +258,9 @@ declare
   v_new_tier text;
   v_winner_ids uuid[];
   v_loser_streak int;
+  v_games int;
+  v_placement_games constant int := 5;
 begin
-  -- Winning team's user_ids — used as the "breakers" array on any
-  -- streak-ended announcement we emit below.
   select array_agg(mp.user_id)
     into v_winner_ids
   from public.match_participants mp
@@ -243,8 +279,29 @@ begin
       (participant.team = 'A' and new.score_a > new.score_b)
       or (participant.team = 'B' and new.score_b > new.score_a);
 
+    -- Post-match games_played for this mode (settle_match already
+    -- incremented it).
+    if new.match_type = 'singles' then
+      select singles_games_played into v_games
+        from public.profiles where id = participant.user_id;
+    else
+      select doubles_games_played into v_games
+        from public.profiles where id = participant.user_id;
+    end if;
+
+    -- Placement-complete reveal — fires for every participant whose
+    -- 5th game just settled, regardless of win/loss.
+    if v_games = v_placement_games and participant.rating_after is not null then
+      insert into public.chat_messages
+        (kind, user_id, match_type, tier_key, expires_at)
+      values
+        ('system_tier_up', participant.user_id, new.match_type,
+         public.rating_to_tier_key(participant.rating_after),
+         now() + interval '30 days');
+    end if;
+
     if participant_won then
-      -- (a) Existing on-going streak announcement.
+      -- (a) Existing on-going streak announcement (placement-agnostic).
       v_streak := public.current_streak_for_user_mode(
         participant.user_id, new.match_type);
       if v_streak >= 2 then
@@ -255,8 +312,11 @@ begin
            now() + interval '30 days');
       end if;
 
-      -- (b) Tier-up announcement: rating crossed a bracket upward.
-      if participant.rating_before is not null
+      -- (b) Tier-up announcement: only after placement is over
+      -- (games_played > 5). The exact placement-complete game is
+      -- handled by the placement reveal block above.
+      if v_games > v_placement_games
+         and participant.rating_before is not null
          and participant.rating_after is not null then
         v_old_tier := public.rating_to_tier_key(participant.rating_before);
         v_new_tier := public.rating_to_tier_key(participant.rating_after);
@@ -271,8 +331,7 @@ begin
       end if;
 
     else
-      -- (c) Streak-ended: this loser had a >=2 streak going into the
-      --     match. Breakers are the winning side.
+      -- (c) Streak-ended (placement-agnostic).
       if v_winner_ids is not null and array_length(v_winner_ids, 1) >= 1 then
         v_loser_streak := public.streak_before_match(
           participant.user_id, new.match_type, new.id);
@@ -288,8 +347,8 @@ begin
     end if;
   end loop;
 
-  -- Lazy cleanup of expired system rows. User chat (expires_at = null)
-  -- is kept indefinitely.
+  -- Stale match-derived announcements go; ban / reset moderation logs
+  -- are kept (they have their own 30-day timer).
   delete from public.chat_messages
    where kind in ('system_streak', 'system_tier_up', 'system_streak_ended')
      and expires_at is not null

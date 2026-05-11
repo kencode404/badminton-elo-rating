@@ -77,6 +77,11 @@ export function ClubChat() {
   // bell. We scroll to + flash that message after the list loads.
   const targetMsgId = searchParams.get('msg');
   const scrolledToTargetRef = useRef<string | null>(null);
+  // Counts in-flight optimistic reaction writes. While > 0, we skip
+  // the realtime/poll-driven loadReactions() so a fetch that races
+  // ahead of our DB commit can't overwrite the optimistic state with
+  // stale data (the user-visible flicker bug).
+  const inFlightReactionWritesRef = useRef(0);
   const [messages, setMessages] = useState<ChatMsg[] | null>(null);
   const [reactions, setReactions] = useState<Reaction[]>([]);
   // Display-name lookup for users referenced in breaker_user_ids on
@@ -196,6 +201,10 @@ export function ClubChat() {
     }
 
     async function loadReactions() {
+      // Skip the fetch entirely while one of our own optimistic
+      // writes is still in flight — otherwise this can return the
+      // pre-write DB state and overwrite the optimistic update.
+      if (inFlightReactionWritesRef.current > 0) return;
       const { data, error } = await supabase
         .from('chat_reactions')
         .select('message_id, user_id, emoji, profiles:user_id(display_name, avatar_url)');
@@ -203,6 +212,9 @@ export function ClubChat() {
       if (error) {
         return;
       }
+      // One more guard: another write may have started while we were
+      // waiting for the response. Don't apply this stale snapshot.
+      if (inFlightReactionWritesRef.current > 0) return;
       type Joined = {
         message_id: string;
         user_id: string;
@@ -607,20 +619,25 @@ export function ClubChat() {
         ]);
       }
 
-      const result =
-        mine && mine.emoji === emoji
-          ? await supabase
-              .from('chat_reactions')
-              .delete()
-              .eq('message_id', messageId)
-              .eq('user_id', myUserId)
-          : await supabase.from('chat_reactions').upsert(
-              { message_id: messageId, user_id: myUserId, emoji },
-              { onConflict: 'message_id,user_id' },
-            );
-      if (result.error) {
-        setReactions(prev);
-        setError(formatError(result.error));
+      inFlightReactionWritesRef.current += 1;
+      try {
+        const result =
+          mine && mine.emoji === emoji
+            ? await supabase
+                .from('chat_reactions')
+                .delete()
+                .eq('message_id', messageId)
+                .eq('user_id', myUserId)
+            : await supabase.from('chat_reactions').upsert(
+                { message_id: messageId, user_id: myUserId, emoji },
+                { onConflict: 'message_id,user_id' },
+              );
+        if (result.error) {
+          setReactions(prev);
+          setError(formatError(result.error));
+        }
+      } finally {
+        inFlightReactionWritesRef.current -= 1;
       }
     },
     [user, reactions],
