@@ -6,6 +6,8 @@ import { useChatUnread } from '../lib/chat';
 import { useBanWatcher, useAuth } from '../lib/auth';
 import { useRankChange } from '../lib/rank';
 import { flushPendingMatches } from '../lib/matches';
+import { cacheRoster } from '../lib/offline';
+import { supabase } from '../lib/supabase';
 import { TIERS, type TierKey } from '../lib/tiers';
 
 interface NavItem {
@@ -42,14 +44,27 @@ export function AppShell() {
   // suppressed in chat too until placement ends.
   const { event: rankEvent, dismiss: dismissRankEvent } = useRankChange();
 
-  // Drain any matches queued offline as soon as we have a session +
-  // the network comes back. Cheap on each load — getQueuedMatches
-  // returns an empty array for the common case.
+  // On every signed-in session: prefetch the full active roster into
+  // the IDB cache so the offline picker has someone to show, AND
+  // drain any matches queued from a prior offline session.
   const { user } = useAuth();
   useEffect(() => {
     if (!user) return;
+
+    async function refreshRoster() {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .eq('is_banned', false)
+        .order('display_name', { ascending: true });
+      if (data) await cacheRoster(data);
+    }
+
+    void refreshRoster();
     void flushPendingMatches();
+
     const onOnline = () => {
+      void refreshRoster();
       void flushPendingMatches();
     };
     window.addEventListener('online', onOnline);

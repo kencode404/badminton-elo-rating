@@ -71,13 +71,11 @@ export async function searchPlayers(
 
   try {
     const rows = await fromNetwork();
-    // Mirror the (unfiltered-style) result into the local roster
-    // cache for offline use. We only mirror when the search isn't
-    // narrowed by excludeIds — those exclusions are picker-flow
-    // specific, not roster state.
-    if (excludeIds.length === 0) {
-      void cacheRoster(rows);
-    }
+    // Mirror every result into the cache — even narrowed searches
+    // contribute. Users excluded from this specific call are still
+    // covered by the AppShell prefetch (no exclude), so the cache
+    // stays comprehensive over time.
+    void cacheRoster(rows);
     return rows;
   } catch (err) {
     if (looksLikeNetworkError(err)) {

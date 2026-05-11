@@ -322,21 +322,45 @@ export function ClubChat() {
     }
   }, [messages]);
 
-  // Notification deep-link: when the URL carries ?msg=<id>, scroll the
-  // chat list to that message and briefly ring it. Runs once per id.
+  // Notification deep-link: when the URL carries ?msg=<id>, scroll
+  // the chat list to that message and briefly ring it. Deferred ~250ms
+  // so it runs AFTER the first-render "scroll to last-read" effect
+  // (which would otherwise overwrite our scroll). Idempotent per id.
   useEffect(() => {
     if (!targetMsgId || !messages) return;
     if (scrolledToTargetRef.current === targetMsgId) return;
-    const target = listRef.current?.querySelector(
-      `[data-msg-id="${targetMsgId}"]`,
-    ) as HTMLElement | null;
-    if (!target) return;
-    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    target.classList.add('ring-2', 'ring-cyan2-400', 'rounded-md');
-    window.setTimeout(() => {
-      target.classList.remove('ring-2', 'ring-cyan2-400', 'rounded-md');
-    }, 1600);
-    scrolledToTargetRef.current = targetMsgId;
+
+    const handle = window.setTimeout(() => {
+      const container = listRef.current;
+      if (!container) return;
+      const target = container.querySelector(
+        `[data-msg-id="${targetMsgId}"]`,
+      ) as HTMLElement | null;
+      if (!target) return;
+
+      // Manual offset math — more reliable than scrollIntoView when
+      // there's a parent scroll container with maxHeight.
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const offsetWithinContainer =
+        targetRect.top - containerRect.top + container.scrollTop;
+      const desired =
+        offsetWithinContainer -
+        container.clientHeight / 2 +
+        target.clientHeight / 2;
+      container.scrollTo({
+        top: Math.max(0, desired),
+        behavior: 'smooth',
+      });
+
+      target.classList.add('ring-2', 'ring-cyan2-400', 'rounded-md');
+      window.setTimeout(() => {
+        target.classList.remove('ring-2', 'ring-cyan2-400', 'rounded-md');
+      }, 1600);
+      scrolledToTargetRef.current = targetMsgId;
+    }, 250);
+
+    return () => window.clearTimeout(handle);
   }, [targetMsgId, messages]);
 
   // Close any open popover (picker or reactors) on outside tap or Escape.
@@ -533,27 +557,71 @@ export function ClubChat() {
 
   // One reaction per user per message: tapping the same emoji removes
   // your reaction; tapping a different emoji replaces it.
+  //
+  // Optimistic flow — close the picker + patch local state FIRST so
+  // the UI feels instant. The DB write fires in the background;
+  // realtime later confirms the state. On failure we roll back.
   const toggleReaction = useCallback(
     async (messageId: string, emoji: string) => {
       if (!user) return;
+      const myUserId = user.id;
       const mine = reactions.find(
-        (r) => r.message_id === messageId && r.user_id === user.id,
+        (r) => r.message_id === messageId && r.user_id === myUserId,
       );
-      if (mine && mine.emoji === emoji) {
-        await supabase
-          .from('chat_reactions')
-          .delete()
-          .eq('message_id', messageId)
-          .eq('user_id', user.id);
-      } else {
-        await supabase
-          .from('chat_reactions')
-          .upsert(
-            { message_id: messageId, user_id: user.id, emoji },
-            { onConflict: 'message_id,user_id' },
-          );
-      }
+
       setPickerForMsg(null);
+      const prev = reactions;
+
+      if (mine && mine.emoji === emoji) {
+        // Remove
+        setReactions((rs) =>
+          rs.filter(
+            (r) =>
+              !(r.message_id === messageId && r.user_id === myUserId),
+          ),
+        );
+      } else if (mine) {
+        // Replace with the new emoji
+        setReactions((rs) =>
+          rs.map((r) =>
+            r.message_id === messageId && r.user_id === myUserId
+              ? { ...r, emoji }
+              : r,
+          ),
+        );
+      } else {
+        // Add — display_name/avatar_url are placeholders that
+        // realtime will overwrite once the row round-trips back.
+        setReactions((rs) => [
+          ...rs,
+          {
+            message_id: messageId,
+            user_id: myUserId,
+            emoji,
+            display_name:
+              (user.user_metadata?.display_name as string | undefined) ??
+              user.email?.split('@')[0] ??
+              'You',
+            avatar_url: null,
+          },
+        ]);
+      }
+
+      const result =
+        mine && mine.emoji === emoji
+          ? await supabase
+              .from('chat_reactions')
+              .delete()
+              .eq('message_id', messageId)
+              .eq('user_id', myUserId)
+          : await supabase.from('chat_reactions').upsert(
+              { message_id: messageId, user_id: myUserId, emoji },
+              { onConflict: 'message_id,user_id' },
+            );
+      if (result.error) {
+        setReactions(prev);
+        setError(formatError(result.error));
+      }
     },
     [user, reactions],
   );
