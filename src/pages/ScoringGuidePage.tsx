@@ -231,15 +231,30 @@ export function ScoringGuidePage() {
         <ul className="space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
           <li className="flex items-start gap-2">
             <span className="text-cyan2-500 dark:text-cyan2-300 mt-0.5 shrink-0">◆</span>
-            <span>When someone records a match, all other players must accept it before ratings update.</span>
+            <span>
+              The recorder's submission counts as their team's acceptance.
+              At least <strong>one player from the opposing team</strong> must
+              accept for the match to confirm.
+            </span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-cyan2-500 dark:text-cyan2-300 mt-0.5 shrink-0">◆</span>
-            <span>If anyone rejects, the match is dropped and no ratings change.</span>
+            <span>
+              Singles needs both players. Doubles only needs one player from
+              each side — the partner and the other opponent stay pending
+              but their ratings still update when the match settles.
+            </span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-cyan2-500 dark:text-cyan2-300 mt-0.5 shrink-0">◆</span>
-            <span>Pending matches expire after <strong>7 days</strong> if not all confirmed.</span>
+            <span>
+              <strong>Any single rejection</strong> kills the match. One veto
+              is enough — no ratings change for anyone.
+            </span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-cyan2-500 dark:text-cyan2-300 mt-0.5 shrink-0">◆</span>
+            <span>Pending matches expire after <strong>7 days</strong> if no one has confirmed.</span>
           </li>
         </ul>
       </section>

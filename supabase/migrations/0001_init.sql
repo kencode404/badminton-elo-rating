@@ -266,10 +266,18 @@ begin
     return;
   end if;
 
-  -- Bail if anyone is still unconfirmed.
-  if exists (
+  -- One acceptance per team is enough. Bail if either side has none.
+  -- Singles falls out naturally: 1 per team = both players.
+  if not exists (
     select 1 from public.match_participants
-    where match_id = p_match_id and confirmation <> 'accepted'
+     where match_id = p_match_id
+       and team = 'A'
+       and confirmation = 'accepted'
+  ) or not exists (
+    select 1 from public.match_participants
+     where match_id = p_match_id
+       and team = 'B'
+       and confirmation = 'accepted'
   ) then
     return;
   end if;
@@ -388,14 +396,23 @@ begin
   end if;
 
   if new.confirmation = 'rejected' then
+    -- Any single rejection kills the match — one veto is enough.
     update public.matches set status = 'rejected' where id = new.match_id;
     return new;
   end if;
 
   if new.confirmation = 'accepted' then
-    if not exists (
+    -- Settle as soon as each team has at least one acceptance.
+    if exists (
       select 1 from public.match_participants
-      where match_id = new.match_id and confirmation <> 'accepted'
+       where match_id = new.match_id
+         and team = 'A'
+         and confirmation = 'accepted'
+    ) and exists (
+      select 1 from public.match_participants
+       where match_id = new.match_id
+         and team = 'B'
+         and confirmation = 'accepted'
     ) then
       perform public.settle_match(new.match_id);
     end if;
