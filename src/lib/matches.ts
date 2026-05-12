@@ -2,11 +2,15 @@ import { supabase } from './supabase';
 import {
   cacheRoster,
   deleteQueuedMatch,
+  deleteQueuedMatchEdit,
   getCachedRoster,
   getQueuedMatches,
+  getQueuedMatchEdits,
   isOffline,
   looksLikeNetworkError,
   queueMatch,
+  queueMatchEdit,
+  type QueuedMatchEdit,
   type QueuedMatchInput,
 } from './offline';
 import type { Confirmation, Database, MatchType, Team } from './database.types';
@@ -245,6 +249,101 @@ export async function flushPendingMatches(): Promise<number> {
     }
   }
   return sent;
+}
+
+// Online-aware wrapper for editing a pending match. Mirrors
+// recordMatchOnlineOrQueue — queues to IDB on offline / network
+// failure, returns 'queued' so the UI can show the user-edited
+// state immediately while waiting for connectivity.
+export interface EditMatchInput {
+  matchId: string;
+  partnerId: string | null;     // null for singles
+  opponentIds: string[];
+  scoreA: number;
+  scoreB: number;
+}
+
+export async function updateMatchOnlineOrQueue(
+  input: EditMatchInput,
+  participantNames: string[],
+): Promise<{ kind: 'sent' } | { kind: 'queued' }> {
+  const queuedPayload: QueuedMatchEdit = {
+    match_id: input.matchId,
+    partner_id: input.partnerId,
+    opponent_ids: input.opponentIds,
+    score_a: input.scoreA,
+    score_b: input.scoreB,
+    participant_names: participantNames,
+    queued_at: new Date().toISOString(),
+  };
+
+  async function callRpc() {
+    const { error } = await supabase.rpc('update_pending_match', {
+      p_match_id: input.matchId,
+      p_partner_id: input.partnerId,
+      p_opponent_ids: input.opponentIds,
+      p_score_a: input.scoreA,
+      p_score_b: input.scoreB,
+    });
+    if (error) throw error;
+  }
+
+  if (isOffline()) {
+    await queueMatchEdit(queuedPayload);
+    return { kind: 'queued' };
+  }
+  try {
+    await callRpc();
+    // If a queued edit for this match exists from an earlier offline
+    // session, drop it — the latest edit just succeeded online.
+    await deleteQueuedMatchEdit(input.matchId);
+    return { kind: 'sent' };
+  } catch (err) {
+    if (looksLikeNetworkError(err)) {
+      await queueMatchEdit(queuedPayload);
+      return { kind: 'queued' };
+    }
+    throw err;
+  }
+}
+
+// Replay any edits that were queued offline. Called from AppShell
+// on mount + on the browser 'online' event. Failures from the
+// guard checks (match no longer pending, someone accepted, etc.)
+// drop the queued edit silently — the user can be notified via a
+// later UI pass if needed.
+export async function flushPendingMatchEdits(): Promise<{
+  sent: number;
+  dropped: number;
+}> {
+  if (isOffline()) return { sent: 0, dropped: 0 };
+  const queue = await getQueuedMatchEdits();
+  let sent = 0;
+  let dropped = 0;
+  for (const e of queue) {
+    try {
+      const { error } = await supabase.rpc('update_pending_match', {
+        p_match_id: e.match_id,
+        p_partner_id: e.partner_id,
+        p_opponent_ids: e.opponent_ids,
+        p_score_a: e.score_a,
+        p_score_b: e.score_b,
+      });
+      if (error) throw error;
+      await deleteQueuedMatchEdit(e.match_id);
+      sent += 1;
+    } catch (err) {
+      if (looksLikeNetworkError(err)) {
+        // Connection died mid-flush — leave the rest queued.
+        break;
+      }
+      // Permanent failure (match no longer pending, someone
+      // accepted, etc.). Drop the row so it doesn't loop forever.
+      await deleteQueuedMatchEdit(e.match_id);
+      dropped += 1;
+    }
+  }
+  return { sent, dropped };
 }
 
 export async function respondToMatch(

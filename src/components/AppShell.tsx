@@ -5,7 +5,7 @@ import { RankChangeOverlay } from './RankChangeOverlay';
 import { useChatUnread } from '../lib/chat';
 import { useBanWatcher, useAuth } from '../lib/auth';
 import { useRankChange } from '../lib/rank';
-import { flushPendingMatches } from '../lib/matches';
+import { flushPendingMatches, flushPendingMatchEdits } from '../lib/matches';
 import { cacheRoster } from '../lib/offline';
 import { supabase } from '../lib/supabase';
 import { TIERS, type TierKey } from '../lib/tiers';
@@ -62,10 +62,12 @@ export function AppShell() {
 
     void refreshRoster();
     void flushPendingMatches();
+    void flushPendingMatchEdits();
 
     const onOnline = () => {
       void refreshRoster();
       void flushPendingMatches();
+      void flushPendingMatchEdits();
     };
     window.addEventListener('online', onOnline);
     return () => window.removeEventListener('online', onOnline);

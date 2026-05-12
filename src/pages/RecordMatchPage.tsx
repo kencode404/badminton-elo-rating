@@ -78,9 +78,22 @@ export function RecordMatchPage() {
           {pending.length > 0 && (
             <section className="space-y-2">
               <div className="section-title">Pending Matches</div>
-              {pending.map((m) => (
-                <MatchRow key={m.match.id} summary={m} />
-              ))}
+              {pending.map((m) => {
+                // Edit allowed only when I'm the creator AND nobody
+                // else has accepted yet (matches the server-side guard
+                // in update_pending_match).
+                const isMine = m.match.created_by === user?.id;
+                const noOneElseAccepted = !m.participants.some(
+                  (p) => p.user_id !== user?.id && p.confirmation === 'accepted',
+                );
+                const editHref =
+                  isMine && noOneElseAccepted
+                    ? `/record/${m.match.id}/edit`
+                    : undefined;
+                return (
+                  <MatchRow key={m.match.id} summary={m} editHref={editHref} />
+                );
+              })}
             </section>
           )}
 
@@ -184,7 +197,13 @@ function InvitationCard({
   );
 }
 
-function MatchRow({ summary }: { summary: MatchSummary }) {
+function MatchRow({
+  summary,
+  editHref,
+}: {
+  summary: MatchSummary;
+  editHref?: string;
+}) {
   const { match, myTeam, myConfirmation, myRatingDelta, participants } = summary;
   const teamA = participants.filter((p) => p.team === 'A');
   const teamB = participants.filter((p) => p.team === 'B');
@@ -202,9 +221,19 @@ function MatchRow({ summary }: { summary: MatchSummary }) {
           </span>
           <StatusPill status={match.status} myConfirmation={myConfirmation} />
         </div>
-        <span className="text-[10px] text-zinc-500 dark:text-zinc-500 tracking-wider">
-          {formatDate(match.played_at)}
-        </span>
+        <div className="flex items-center gap-2">
+          {editHref && (
+            <Link
+              to={editHref}
+              className="text-[10px] font-display uppercase tracking-widest px-2 py-0.5 rounded border border-cyan2-400/40 text-cyan2-500 dark:text-cyan2-300 hover:bg-cyan2-500/10 transition"
+            >
+              ✎ Edit
+            </Link>
+          )}
+          <span className="text-[10px] text-zinc-500 dark:text-zinc-500 tracking-wider">
+            {formatDate(match.played_at)}
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">

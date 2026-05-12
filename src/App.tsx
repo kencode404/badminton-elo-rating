@@ -4,6 +4,7 @@ import { HomePage } from './pages/HomePage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { RecordMatchPage } from './pages/RecordMatchPage';
 import { NewMatchPage } from './pages/NewMatchPage';
+import { EditMatchPage } from './pages/EditMatchPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { AdminPage } from './pages/AdminPage';
 import { ShopPage } from './pages/ShopPage';
@@ -28,6 +29,7 @@ export function App() {
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/record" element={<RecordMatchPage />} />
         <Route path="/record/new" element={<NewMatchPage />} />
+        <Route path="/record/:matchId/edit" element={<EditMatchPage />} />
         <Route path="/shop" element={<ShopPage />} />
         <Route path="/scoring-guide" element={<ScoringGuidePage />} />
         <Route path="/profile" element={<ProfilePage />} />

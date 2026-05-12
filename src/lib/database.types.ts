@@ -246,6 +246,16 @@ export interface Database {
         Args: { p_target_id: string };
         Returns: void;
       };
+      update_pending_match: {
+        Args: {
+          p_match_id: string;
+          p_partner_id: string | null;
+          p_opponent_ids: string[];
+          p_score_a: number;
+          p_score_b: number;
+        };
+        Returns: void;
+      };
       get_win_streaks: {
         Args: Record<PropertyKey, never>;
         Returns: {
