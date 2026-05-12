@@ -1268,7 +1268,7 @@ function buildPreviewAnnouncements(): ChatMsg[] {
       id: 'preview-season-reset',
       kind: 'system_season_reset',
       user_id: 'preview-admin',
-      body: 'Season 1 reset by Boss Ken',
+      body: 'Season 1 reset by Boss Ken, welcome to Season 2',
       match_type: null,
       streak_count: null,
       tier_key: null,

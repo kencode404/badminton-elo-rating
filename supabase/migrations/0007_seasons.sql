@@ -171,7 +171,8 @@ begin
     'system_season_reset',
     auth.uid(),
     'Season ' || v_current_season || ' reset by ' ||
-      coalesce(v_admin_name, 'admin'),
+      coalesce(v_admin_name, 'admin') ||
+      ', welcome to Season ' || v_next_season,
     now() + interval '30 days'
   );
 
