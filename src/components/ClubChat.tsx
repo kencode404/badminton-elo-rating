@@ -539,6 +539,7 @@ export function ClubChat() {
         .from('profiles')
         .select('id, display_name, avatar_url')
         .eq('is_banned', false)
+        .eq('is_anonymous', false)
         .order('display_name', { ascending: true })
         .limit(8);
       if (trimmed.length > 0) q = q.ilike('display_name', `${trimmed}%`);

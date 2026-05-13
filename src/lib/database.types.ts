@@ -2,7 +2,12 @@
 // You can later replace this with `supabase gen types typescript` output.
 
 export type MatchType = 'singles' | 'doubles';
-export type MatchStatus = 'pending' | 'confirmed' | 'rejected' | 'expired';
+export type MatchStatus =
+  | 'pending'
+  | 'awaiting_admin'
+  | 'confirmed'
+  | 'rejected'
+  | 'expired';
 export type Team = 'A' | 'B';
 export type Confirmation = 'pending' | 'accepted' | 'rejected';
 export type ChatMessageKind =
@@ -35,6 +40,7 @@ export interface Database {
           banned_at: string | null;
           banned_by: string | null;
           banned_reason: string | null;
+          is_anonymous: boolean;
         };
         Insert: {
           id: string;
@@ -53,6 +59,7 @@ export interface Database {
           banned_at?: string | null;
           banned_by?: string | null;
           banned_reason?: string | null;
+          is_anonymous?: boolean;
         };
         Update: {
           display_name?: string;
@@ -70,6 +77,7 @@ export interface Database {
           banned_at?: string | null;
           banned_by?: string | null;
           banned_reason?: string | null;
+          is_anonymous?: boolean;
         };
         Relationships: [];
       };
@@ -192,6 +200,7 @@ export interface Database {
         Row: {
           match_id: string;
           user_id: string;
+          slot: number;
           team: Team;
           confirmation: Confirmation;
           responded_at: string | null;
@@ -202,6 +211,7 @@ export interface Database {
         Insert: {
           match_id: string;
           user_id: string;
+          slot?: number;
           team: Team;
           confirmation?: Confirmation;
         };
@@ -267,6 +277,14 @@ export interface Database {
       is_match_participant: {
         Args: { p_match_id: string; p_user_id: string };
         Returns: boolean;
+      };
+      approve_anonymous_match: {
+        Args: { p_match_id: string };
+        Returns: void;
+      };
+      reject_anonymous_match: {
+        Args: { p_match_id: string };
+        Returns: void;
       };
     };
     Enums: {

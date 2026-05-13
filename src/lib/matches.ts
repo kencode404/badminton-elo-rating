@@ -13,6 +13,7 @@ import {
   type QueuedMatchEdit,
   type QueuedMatchInput,
 } from './offline';
+import { ANONYMOUS_ID } from './anonymous';
 import type { Confirmation, Database, MatchType, Team } from './database.types';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -39,10 +40,13 @@ export async function searchPlayers(
   const trimmed = query.trim();
 
   async function fromNetwork() {
+    // Anonymous is excluded from regular search; PlayerPicker pins it
+    // separately so it can be picked multiple times.
     let q = supabase
       .from('profiles')
       .select('id, display_name, avatar_url')
       .eq('is_banned', false)
+      .eq('is_anonymous', false)
       .order('display_name', { ascending: true })
       .limit(limit);
     if (trimmed) q = q.ilike('display_name', `%${trimmed}%`);
@@ -60,7 +64,7 @@ export async function searchPlayers(
     const exclude = new Set(excludeIds);
     const lower = trimmed.toLowerCase();
     return rows
-      .filter((p) => !exclude.has(p.id))
+      .filter((p) => !exclude.has(p.id) && p.id !== ANONYMOUS_ID)
       .filter((p) =>
         lower ? p.display_name.toLowerCase().includes(lower) : true,
       )
@@ -123,8 +127,14 @@ export async function createMatch(input: CreateMatchInput): Promise<Match> {
   } else {
     if (!partnerId) throw new Error('Doubles needs a partner');
     if (opponentIds.length !== 2) throw new Error('Doubles needs exactly 2 opponents');
-    const allIds = [creatorId, partnerId, ...opponentIds];
-    if (new Set(allIds).size !== allIds.length) throw new Error('Players must be unique');
+    // Real players must be unique. Anonymous is allowed to repeat
+    // (it's a placeholder for missing/unsigned guests).
+    const realIds = [creatorId, partnerId, ...opponentIds].filter(
+      (id) => id !== ANONYMOUS_ID,
+    );
+    if (new Set(realIds).size !== realIds.length) {
+      throw new Error('Players must be unique');
+    }
   }
 
   const { data: match, error: matchErr } = await supabase
@@ -150,11 +160,20 @@ export async function createMatch(input: CreateMatchInput): Promise<Match> {
     team: 'B' as Team,
   }));
 
-  const rows = [...teamA, ...teamB].map((p) => ({
-    match_id: match.id,
-    user_id: p.user_id,
-    team: p.team,
-  }));
+  // Slot is per-user-per-match. Real players always get slot 0; the
+  // anonymous user gets 0, 1, 2... so it can fill multiple positions
+  // in the same match (PK is match_id + user_id + slot).
+  const slotCounter = new Map<string, number>();
+  const rows = [...teamA, ...teamB].map((p) => {
+    const slot = slotCounter.get(p.user_id) ?? 0;
+    slotCounter.set(p.user_id, slot + 1);
+    return {
+      match_id: match.id,
+      user_id: p.user_id,
+      team: p.team,
+      slot,
+    };
+  });
 
   const { error: partsErr } = await supabase.from('match_participants').insert(rows);
   if (partsErr) {
@@ -163,7 +182,9 @@ export async function createMatch(input: CreateMatchInput): Promise<Match> {
     throw partsErr;
   }
 
-  // Auto-accept the creator's own confirmation.
+  // Auto-accept the creator's own confirmation. (Anonymous is auto-
+  // accepted server-side by the auto_accept_anonymous BEFORE INSERT
+  // trigger, so we don't need to update those rows here.)
   const { error: ackErr } = await supabase
     .from('match_participants')
     .update({ confirmation: 'accepted', responded_at: new Date().toISOString() })

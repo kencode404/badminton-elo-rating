@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { updateMatchOnlineOrQueue } from '../lib/matches';
 import { getQueuedMatchEdit } from '../lib/offline';
 import { PlayerPicker } from '../components/PlayerPicker';
+import { ANONYMOUS_ID } from '../lib/anonymous';
 import { formatError } from '../lib/errors';
 import type { Database, MatchType, Team } from '../lib/database.types';
 
@@ -72,11 +73,14 @@ export function EditMatchPage() {
         .eq('match_id', matchId!);
       if (!active) return;
 
-      // Guard: someone besides the creator already accepted → block
+      // Guard: a REAL player (not anonymous) besides the creator
+      // already accepted → block. Anonymous's auto-acceptance doesn't
+      // count — matches the server-side guard in update_pending_match.
       const externalAccepted = (parts ?? []).some(
         (p) =>
           (p as { user_id: string; confirmation: string }).user_id !==
             user!.id &&
+          (p as { user_id: string }).user_id !== ANONYMOUS_ID &&
           (p as { confirmation: string }).confirmation === 'accepted',
       );
       if (externalAccepted) {

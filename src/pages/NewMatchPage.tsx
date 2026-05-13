@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { recordMatchOnlineOrQueue } from '../lib/matches';
 import { PlayerPicker } from '../components/PlayerPicker';
+import { ANONYMOUS_ID } from '../lib/anonymous';
 import type { Database, MatchType } from '../lib/database.types';
 
 type ProfileLite = Pick<Database['public']['Tables']['profiles']['Row'], 'id' | 'display_name' | 'avatar_url'>;
@@ -85,6 +86,9 @@ export function NewMatchPage() {
 
   if (!user) return null;
   const excludeIds = [user.id];
+  const hasAnonymous =
+    partner.some((p) => p.id === ANONYMOUS_ID) ||
+    opponents.some((p) => p.id === ANONYMOUS_ID);
 
   return (
     <div className="p-4 space-y-4">
@@ -152,6 +156,12 @@ export function NewMatchPage() {
             Higher score wins. No ties.
           </p>
         </section>
+
+        {hasAnonymous && (
+          <div className="text-[10px] font-display tracking-widest uppercase text-amber-600 dark:text-amber-300 bg-amber-500/5 border border-amber-400/30 rounded-md px-3 py-2">
+            ⚠ Anonymous in lineup — match requires admin approval
+          </div>
+        )}
 
         {error && (
           <div className="text-xs text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/40 rounded-md px-3 py-2">

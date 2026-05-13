@@ -176,6 +176,16 @@ begin
     now() + interval '30 days'
   );
 
+  -- The anonymous player's rating tracks the club average. After
+  -- everyone is reset to 1000 / 0 games, anonymous should be too.
+  -- Function lives in 0010_anonymous_player.sql; if not yet applied
+  -- this raises at runtime — swallow it so a partial migration set
+  -- can still reset seasons.
+  begin
+    perform public.refresh_anonymous_rating();
+  exception when undefined_function then null;
+  end;
+
   return v_next_season;
 end;
 $$;

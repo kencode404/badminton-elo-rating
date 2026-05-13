@@ -40,6 +40,7 @@ export function LeaderboardPage() {
       .from('profiles')
       .select('*')
       .eq('is_banned', false)
+      .eq('is_anonymous', false)
       .order(ratingCol, { ascending: false })
       .order(gamesCol, { ascending: false })
       .order('display_name', { ascending: true })
@@ -452,6 +453,7 @@ function buildPreviewRows(tab: Tab): Profile[] {
     banned_at: null,
     banned_by: null,
     banned_reason: null,
+    is_anonymous: false,
   }));
 }
 

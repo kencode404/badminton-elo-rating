@@ -56,6 +56,7 @@ export function AppShell() {
         .from('profiles')
         .select('id, display_name, avatar_url')
         .eq('is_banned', false)
+        .eq('is_anonymous', false)
         .order('display_name', { ascending: true });
       if (data) await cacheRoster(data);
     }

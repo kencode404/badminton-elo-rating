@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { getMyMatches, respondToMatch, type MatchSummary } from '../lib/matches';
+import { ANONYMOUS_ID } from '../lib/anonymous';
 import { formatError } from '../lib/errors';
 import type { MatchStatus } from '../lib/database.types';
 
@@ -43,11 +44,20 @@ export function RecordMatchPage() {
     matches?.filter(
       (m) => m.match.status === 'pending' && m.myConfirmation === 'pending',
     ) ?? [];
+  // Awaiting-admin matches always show in the "pending" lane — the
+  // user has finished their part and is waiting on the admin to
+  // approve, so it's still "in flight" from their perspective.
   const pending =
     matches?.filter(
-      (m) => m.match.status === 'pending' && m.myConfirmation === 'accepted',
+      (m) =>
+        (m.match.status === 'pending' && m.myConfirmation === 'accepted') ||
+        m.match.status === 'awaiting_admin',
     ) ?? [];
-  const history = matches?.filter((m) => m.match.status !== 'pending') ?? [];
+  const history =
+    matches?.filter(
+      (m) =>
+        m.match.status !== 'pending' && m.match.status !== 'awaiting_admin',
+    ) ?? [];
 
   return (
     <div className="p-4 space-y-5">
@@ -79,15 +89,20 @@ export function RecordMatchPage() {
             <section className="space-y-2">
               <div className="section-title">Pending Matches</div>
               {pending.map((m) => {
-                // Edit allowed only when I'm the creator AND nobody
-                // else has accepted yet (matches the server-side guard
-                // in update_pending_match).
+                // Edit allowed only when status is still 'pending'
+                // (NOT 'awaiting_admin'), I'm the creator, AND no
+                // OTHER REAL player has accepted. Anonymous's auto-
+                // acceptance doesn't count — it's not a real veto.
+                const isPending = m.match.status === 'pending';
                 const isMine = m.match.created_by === user?.id;
-                const noOneElseAccepted = !m.participants.some(
-                  (p) => p.user_id !== user?.id && p.confirmation === 'accepted',
+                const noRealPlayerElseAccepted = !m.participants.some(
+                  (p) =>
+                    p.user_id !== user?.id &&
+                    p.user_id !== ANONYMOUS_ID &&
+                    p.confirmation === 'accepted',
                 );
                 const editHref =
-                  isMine && noOneElseAccepted
+                  isPending && isMine && noRealPlayerElseAccepted
                     ? `/record/${m.match.id}/edit`
                     : undefined;
                 return (
@@ -289,11 +304,13 @@ function StatusPill({
   myConfirmation: 'pending' | 'accepted' | 'rejected';
 }) {
   const label =
-    status === 'pending' && myConfirmation === 'pending'
-      ? 'awaiting you'
-      : status === 'pending'
-        ? 'awaiting others'
-        : status;
+    status === 'awaiting_admin'
+      ? 'awaiting admin'
+      : status === 'pending' && myConfirmation === 'pending'
+        ? 'awaiting you'
+        : status === 'pending'
+          ? 'awaiting others'
+          : status;
   const color =
     status === 'confirmed'
       ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border-emerald-500/30'
@@ -301,9 +318,11 @@ function StatusPill({
         ? 'bg-red-500/15 text-red-500 dark:text-red-300 border-red-500/30'
         : status === 'expired'
           ? 'bg-zinc-500/15 text-zinc-500 dark:text-zinc-400 border-zinc-500/30'
-          : myConfirmation === 'pending'
-            ? 'bg-cyan2-400/15 text-cyan2-600 dark:text-cyan2-300 border-cyan2-400/40'
-            : 'bg-zinc-500/15 text-zinc-500 dark:text-zinc-400 border-zinc-500/30';
+          : status === 'awaiting_admin'
+            ? 'bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/40'
+            : myConfirmation === 'pending'
+              ? 'bg-cyan2-400/15 text-cyan2-600 dark:text-cyan2-300 border-cyan2-400/40'
+              : 'bg-zinc-500/15 text-zinc-500 dark:text-zinc-400 border-zinc-500/30';
 
   return (
     <span
