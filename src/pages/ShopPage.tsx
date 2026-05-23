@@ -90,8 +90,8 @@ export function ShopPage() {
       <div className="flex items-center justify-between">
         <div className="section-title text-base">Shop</div>
         {/* Live balance chip */}
-        <div className="inline-flex items-center gap-1.5 text-[11px] font-display tracking-widest uppercase text-cyan2-500 dark:text-cyan2-300 bg-cyan2-500/5 border border-cyan2-400/30 rounded-md px-2 py-0.5">
-          <CoinIcon size={14} />
+        <div className="inline-flex items-center gap-2 text-sm font-display tracking-widest uppercase text-cyan2-500 dark:text-cyan2-300 bg-cyan2-500/5 border border-cyan2-400/30 rounded-md px-2.5 py-1">
+          <CoinIcon size={22} />
           {shards === null ? '…' : shards.toLocaleString()}
         </div>
       </div>
@@ -149,15 +149,23 @@ export function ShopPage() {
                   {item.kind === 'iron' ? '🛡' : '✦'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2">
-                    <h3 className={`font-display text-sm uppercase tracking-widest ${item.accent}`}>
-                      {item.name}
-                    </h3>
-                    {isOwned && (
-                      <span className="text-[9px] font-display uppercase tracking-widest text-emerald-400 border border-emerald-400/50 px-1.5 py-0.5 rounded">
-                        Armed
-                      </span>
-                    )}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-baseline gap-2 min-w-0">
+                      <h3 className={`font-display text-sm uppercase tracking-widest truncate ${item.accent}`}>
+                        {item.name}
+                      </h3>
+                      {isOwned && (
+                        <span className="text-[9px] font-display uppercase tracking-widest text-emerald-400 border border-emerald-400/50 px-1.5 py-0.5 rounded shrink-0">
+                          Armed
+                        </span>
+                      )}
+                    </div>
+                    {/* Price chip — always visible so the cost reads even
+                        when the buy button is disabled */}
+                    <span className="inline-flex items-center gap-1.5 text-sm font-display tracking-widest text-cyan2-500 dark:text-cyan2-300 shrink-0">
+                      <CoinIcon size={18} glow={false} />
+                      {item.price}
+                    </span>
                   </div>
                   <p className="text-[11px] text-zinc-500 dark:text-zinc-500 italic">
                     {item.tagline}
@@ -191,9 +199,9 @@ export function ShopPage() {
                 ) : buying ? (
                   'Buying…'
                 ) : (
-                  <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-2">
                     Buy
-                    <CoinIcon size={12} glow={false} />
+                    <CoinIcon size={18} glow={false} />
                     {item.price}
                   </span>
                 )}
