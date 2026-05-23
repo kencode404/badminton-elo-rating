@@ -41,6 +41,8 @@ export interface Database {
           banned_by: string | null;
           banned_reason: string | null;
           is_anonymous: boolean;
+          shards: number;
+          armed_shield: 'iron' | 'aura' | null;
         };
         Insert: {
           id: string;
@@ -60,6 +62,8 @@ export interface Database {
           banned_by?: string | null;
           banned_reason?: string | null;
           is_anonymous?: boolean;
+          shards?: number;
+          armed_shield?: 'iron' | 'aura' | null;
         };
         Update: {
           display_name?: string;
@@ -78,6 +82,8 @@ export interface Database {
           banned_by?: string | null;
           banned_reason?: string | null;
           is_anonymous?: boolean;
+          shards?: number;
+          armed_shield?: 'iron' | 'aura' | null;
         };
         Relationships: [];
       };
@@ -207,6 +213,8 @@ export interface Database {
           rating_before: number | null;
           rating_after: number | null;
           rating_delta: number | null;
+          shards_earned: number;
+          shield_consumed: 'iron' | 'aura' | null;
         };
         Insert: {
           match_id: string;
@@ -285,6 +293,10 @@ export interface Database {
       reject_anonymous_match: {
         Args: { p_match_id: string };
         Returns: void;
+      };
+      buy_shield: {
+        Args: { p_kind: 'iron' | 'aura' };
+        Returns: number;
       };
     };
     Enums: {

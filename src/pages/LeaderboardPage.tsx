@@ -454,6 +454,8 @@ function buildPreviewRows(tab: Tab): Profile[] {
     banned_by: null,
     banned_reason: null,
     is_anonymous: false,
+    shards: 0,
+    armed_shield: null,
   }));
 }
 
