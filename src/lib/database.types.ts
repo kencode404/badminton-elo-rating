@@ -43,6 +43,7 @@ export interface Database {
           is_anonymous: boolean;
           shards: number;
           armed_shield: 'iron' | 'aura' | null;
+          armed_booster: 'shuttle' | null;
         };
         Insert: {
           id: string;
@@ -64,6 +65,7 @@ export interface Database {
           is_anonymous?: boolean;
           shards?: number;
           armed_shield?: 'iron' | 'aura' | null;
+          armed_booster?: 'shuttle' | null;
         };
         Update: {
           display_name?: string;
@@ -84,6 +86,7 @@ export interface Database {
           is_anonymous?: boolean;
           shards?: number;
           armed_shield?: 'iron' | 'aura' | null;
+          armed_booster?: 'shuttle' | null;
         };
         Relationships: [];
       };
@@ -215,6 +218,7 @@ export interface Database {
           rating_delta: number | null;
           shards_earned: number;
           shield_consumed: 'iron' | 'aura' | null;
+          booster_consumed: 'shuttle' | null;
         };
         Insert: {
           match_id: string;
@@ -296,6 +300,10 @@ export interface Database {
       };
       buy_shield: {
         Args: { p_kind: 'iron' | 'aura' };
+        Returns: number;
+      };
+      buy_booster: {
+        Args: { p_kind: 'shuttle' };
         Returns: number;
       };
     };

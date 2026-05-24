@@ -8,9 +8,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      // Tier badges + shuttlecock are static, rarely change, and need
-      // to render even on a flaky connection — precache them so the
-      // service worker serves from cache instead of hitting the network.
+      // Tier badges, shuttlecock, and shop product art are static,
+      // rarely change, and need to render even on a flaky connection
+      // — precache them so the service worker serves from cache
+      // instead of hitting the network.
       includeAssets: [
         'favicon.svg',
         'app-icon.svg',
@@ -20,6 +21,9 @@ export default defineConfig({
         'gold-tier.png',
         'diamond-tier.png',
         'predator-tier.png',
+        'Titanium-shield.png',
+        'Vibranium-shield.png',
+        'Platinum-shuttlecock.png',
       ],
       workbox: {
         // Runtime caching for Supabase reads + avatar images so users

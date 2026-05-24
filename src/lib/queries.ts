@@ -110,6 +110,7 @@ export function useRespondToMatch(userId: string | undefined) {
 export interface MyProfileLite {
   shards: number;
   armed_shield: 'iron' | 'aura' | null;
+  armed_booster: 'shuttle' | null;
 }
 
 export function useMyProfile(userId: string | undefined) {
@@ -118,13 +119,14 @@ export function useMyProfile(userId: string | undefined) {
     queryFn: async (): Promise<MyProfileLite> => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('shards, armed_shield')
+        .select('shards, armed_shield, armed_booster')
         .eq('id', userId!)
         .maybeSingle();
       if (error) throw error;
       return {
         shards: data?.shards ?? 0,
         armed_shield: (data?.armed_shield as 'iron' | 'aura' | null) ?? null,
+        armed_booster: (data?.armed_booster as 'shuttle' | null) ?? null,
       };
     },
     enabled: !!userId,
@@ -150,8 +152,46 @@ export function useBuyShield(userId: string | undefined) {
       qc.setQueryData<MyProfileLite>(key, (curr) =>
         curr
           ? {
+              ...curr,
               shards: Math.max(0, curr.shards - cost),
               armed_shield: kind,
+            }
+          : curr,
+      );
+      return { prev };
+    },
+    onError: (_err, _kind, ctx) => {
+      if (!userId) return;
+      qc.setQueryData(qk.myProfile(userId), ctx?.prev);
+    },
+    onSettled: () => {
+      if (!userId) return;
+      qc.invalidateQueries({ queryKey: qk.myProfile(userId) });
+    },
+  });
+}
+
+// Buy a booster. Mirrors useBuyShield — separate slot, separate cost.
+export function useBuyBooster(userId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (kind: 'shuttle') => {
+      const { data, error } = await supabase.rpc('buy_booster', { p_kind: kind });
+      if (error) throw error;
+      return data as number;
+    },
+    onMutate: async (kind) => {
+      if (!userId) return;
+      const key = qk.myProfile(userId);
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<MyProfileLite>(key);
+      const cost = kind === 'shuttle' ? 50 : 0;
+      qc.setQueryData<MyProfileLite>(key, (curr) =>
+        curr
+          ? {
+              ...curr,
+              shards: Math.max(0, curr.shards - cost),
+              armed_booster: kind,
             }
           : curr,
       );

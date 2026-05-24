@@ -412,6 +412,7 @@ function buildPreviewRows(tab: Tab): Profile[] {
     is_anonymous: false,
     shards: 0,
     armed_shield: null,
+    armed_booster: null,
   }));
 }
 
