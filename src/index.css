@@ -38,6 +38,20 @@
   }
 }
 
+/* Vibranium shield "growing light" effect — a soft purple→blue halo
+   behind the shield that scales up and fades on a loop. The shield
+   image itself stays still. */
+@keyframes vibranium-halo {
+  0%, 100% {
+    transform: scale(0.85);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.15;
+  }
+}
+
 /* Predator-tier row glow on the leaderboard. Pulses the red aura
    that's set inline as box-shadow. */
 @keyframes pulse-glow {

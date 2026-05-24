@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { CoinIcon } from '../components/CoinIcon';
-import { ShieldIcon } from '../components/ShieldIcon';
 import { useAuth } from '../lib/auth';
 import { useBuyShield, useMyProfile } from '../lib/queries';
 import { formatError } from '../lib/errors';
@@ -14,6 +13,9 @@ import { formatError } from '../lib/errors';
 // while a shield is armed; the slot clears server-side when the
 // shield is consumed by a loss (wins / unsettled matches keep it).
 
+// DB enum value — kept as 'iron'/'aura' so the existing armed_shield
+// column and check constraint still match. The display labels below
+// rebrand them to Titanium/Vibranium.
 type ShieldKind = 'iron' | 'aura';
 
 interface ShopItem {
@@ -22,6 +24,7 @@ interface ShopItem {
   tagline: string;
   description: string;
   price: number;
+  image: string;    // path under /public
   accent: string;   // tailwind text color class
   ring: string;     // tailwind ring/border tint
 }
@@ -29,23 +32,33 @@ interface ShopItem {
 const ITEMS: ShopItem[] = [
   {
     kind: 'iron',
-    name: 'Iron Shield',
+    name: 'Titanium Shield',
     tagline: 'Half the sting.',
-    description: 'Blocks 50% of your next ELO loss.',
+    description: 'Blocks 50% of your next loss.',
     price: 60,
+    image: '/Titanium-shield.png',
     accent: 'text-sky-400',
     ring: 'border-sky-500/40',
   },
   {
     kind: 'aura',
-    name: 'Aura Shield',
+    name: 'Vibranium Shield',
     tagline: 'Walk away unscathed.',
-    description: 'Blocks 100% of your next ELO loss.',
+    description: 'Blocks 100% of your next loss.',
     price: 110,
+    image: '/Vibranium-shield.png',
     accent: 'text-violet-400',
     ring: 'border-violet-500/40',
   },
 ];
+
+function shieldLabel(kind: ShieldKind): string {
+  return kind === 'iron' ? 'Titanium Shield' : 'Vibranium Shield';
+}
+
+function shieldImage(kind: ShieldKind): string {
+  return kind === 'iron' ? '/Titanium-shield.png' : '/Vibranium-shield.png';
+}
 
 export function ShopPage() {
   const { user } = useAuth();
@@ -79,14 +92,18 @@ export function ShopPage() {
 
       {armed && (
         <div className="glass-panel px-4 py-3 flex items-center gap-3 border-cyan2-400/40">
-          <ShieldIcon kind={armed} size={42} />
+          <img
+            src={shieldImage(armed)}
+            alt=""
+            className="w-12 h-12 object-contain shrink-0"
+            aria-hidden
+          />
           <div className="flex-1 min-w-0">
             <div className="text-[10px] font-display tracking-widest uppercase text-zinc-500 dark:text-zinc-400">
               Armed
             </div>
             <div className="text-sm text-zinc-900 dark:text-zinc-100">
-              {armed === 'iron' ? 'Iron Shield' : 'Aura Shield'} — triggers on
-              your next loss
+              {shieldLabel(armed)} — triggers on your next loss
             </div>
           </div>
         </div>
@@ -111,7 +128,7 @@ export function ShopPage() {
               className={`glass-panel p-4 border ${item.ring}`}
             >
               <div className="flex items-start gap-3">
-                <ShieldIcon kind={item.kind} size={56} className="shrink-0" />
+                <ShieldArt kind={item.kind} image={item.image} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-baseline gap-2 min-w-0">
@@ -175,6 +192,47 @@ export function ShopPage() {
         })}
       </section>
 
+    </div>
+  );
+}
+
+// Per-shield artwork. Titanium is rendered smaller — it's the lower
+// tier, so the size relationship reinforces hierarchy. Vibranium gets
+// a purple→blue halo that scales/fades on a 2.4s loop plus a gentle
+// bob on the shield itself.
+function ShieldArt({ kind, image }: { kind: ShieldKind; image: string }) {
+  if (kind === 'iron') {
+    return (
+      <img
+        src={image}
+        alt=""
+        className="w-12 h-12 object-contain shrink-0"
+        aria-hidden
+      />
+    );
+  }
+  return (
+    <div className="relative w-16 h-16 shrink-0 flex items-center justify-center">
+      {/* Purple→blue halo, scales up well beyond the shield silhouette
+          and fades on loop. Negative inset gives it room to grow
+          without being clipped by the image bounds. */}
+      <div
+        className="absolute rounded-full pointer-events-none"
+        style={{
+          inset: '-10px',
+          background:
+            'radial-gradient(circle, rgba(139, 92, 246, 0.7) 0%, rgba(59, 130, 246, 0.4) 40%, transparent 70%)',
+          filter: 'blur(8px)',
+          animation: 'vibranium-halo 2.4s ease-in-out infinite',
+        }}
+        aria-hidden
+      />
+      <img
+        src={image}
+        alt=""
+        className="relative w-16 h-16 object-contain"
+        aria-hidden
+      />
     </div>
   );
 }
