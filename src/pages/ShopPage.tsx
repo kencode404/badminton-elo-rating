@@ -82,7 +82,7 @@ const BOOSTERS: BoosterItem[] = [
     kind: 'shuttle',
     name: 'Shuttle Strike',
     tagline: 'Finish strong.',
-    description: 'Adds +5 ELO to your next win. Losses keep it armed.',
+    description: 'Adds +5 points to your next win. Losses keep it armed.',
     price: 50,
     image: '/Platinum-shuttlecock.png',
     accent: 'text-cyan2-300',
