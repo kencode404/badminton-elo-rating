@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { CoinIcon } from '../components/CoinIcon';
+import { ShieldIcon } from '../components/ShieldIcon';
 import { useAuth } from '../lib/auth';
-import { supabase } from '../lib/supabase';
+import { useBuyShield, useMyProfile } from '../lib/queries';
 import { formatError } from '../lib/errors';
 
 // Shop v1 — shard balance + two shield products.
@@ -48,41 +49,21 @@ const ITEMS: ShopItem[] = [
 
 export function ShopPage() {
   const { user } = useAuth();
-  const [shards, setShards] = useState<number | null>(null);
-  const [armed, setArmed] = useState<ShieldKind | null>(null);
+  const { data: profile, error: profileError } = useMyProfile(user?.id);
+  const buyMutation = useBuyShield(user?.id);
   const [busyKind, setBusyKind] = useState<ShieldKind | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    if (!user) return;
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('shards, armed_shield')
-      .eq('id', user.id)
-      .maybeSingle();
-    if (error) {
-      setError(formatError(error));
-      return;
-    }
-    setShards(data?.shards ?? 0);
-    setArmed((data?.armed_shield as ShieldKind | null) ?? null);
-  }, [user]);
+  const shards = profile?.shards ?? null;
+  const armed = profile?.armed_shield ?? null;
+  const error = profileError
+    ? formatError(profileError)
+    : buyMutation.error
+      ? formatError(buyMutation.error)
+      : null;
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  async function buy(kind: ShieldKind) {
+  function buy(kind: ShieldKind) {
     setBusyKind(kind);
-    setError(null);
-    const { data, error } = await supabase.rpc('buy_shield', { p_kind: kind });
-    setBusyKind(null);
-    if (error) {
-      setError(formatError(error));
-      return;
-    }
-    setShards((data as number | null) ?? 0);
-    setArmed(kind);
+    buyMutation.mutate(kind, { onSettled: () => setBusyKind(null) });
   }
 
   return (
@@ -97,14 +78,8 @@ export function ShopPage() {
       </div>
 
       {armed && (
-        <div
-          className={`glass-panel px-4 py-3 flex items-center gap-3 ${
-            armed === 'iron' ? 'border-sky-400/40' : 'border-violet-400/40'
-          }`}
-        >
-          <div className="text-2xl" aria-hidden>
-            {armed === 'iron' ? '🛡' : '✦'}
-          </div>
+        <div className="glass-panel px-4 py-3 flex items-center gap-3 border-cyan2-400/40">
+          <ShieldIcon kind={armed} size={42} />
           <div className="flex-1 min-w-0">
             <div className="text-[10px] font-display tracking-widest uppercase text-zinc-500 dark:text-zinc-400">
               Armed
@@ -136,18 +111,7 @@ export function ShopPage() {
               className={`glass-panel p-4 border ${item.ring}`}
             >
               <div className="flex items-start gap-3">
-                <div
-                  className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-2xl border ${item.ring}`}
-                  style={{
-                    background:
-                      item.kind === 'iron'
-                        ? 'linear-gradient(135deg, #0c4a6e 0%, #1e3a8a 100%)'
-                        : 'linear-gradient(135deg, #312e81 0%, #4c1d95 100%)',
-                  }}
-                  aria-hidden
-                >
-                  {item.kind === 'iron' ? '🛡' : '✦'}
-                </div>
+                <ShieldIcon kind={item.kind} size={56} className="shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-baseline gap-2 min-w-0">

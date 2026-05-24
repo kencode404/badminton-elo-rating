@@ -1,43 +1,30 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { getMyMatches, respondToMatch, type MatchSummary } from '../lib/matches';
+import type { MatchSummary } from '../lib/matches';
+import { useMyMatches, useRespondToMatch } from '../lib/queries';
 import { ANONYMOUS_ID } from '../lib/anonymous';
 import { formatError } from '../lib/errors';
 import type { MatchStatus } from '../lib/database.types';
 
 export function RecordMatchPage() {
   const { user } = useAuth();
-  const [matches, setMatches] = useState<MatchSummary[] | null>(null);
+  const { data: matches, error: queryError, isLoading } = useMyMatches(user?.id);
+  const respondMutation = useRespondToMatch(user?.id);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const error = queryError
+    ? formatError(queryError)
+    : respondMutation.error
+      ? formatError(respondMutation.error)
+      : null;
 
-  const load = useCallback(async () => {
-    if (!user) return;
-    try {
-      const data = await getMyMatches(user.id);
-      setMatches(data);
-    } catch (err) {
-      setError(formatError(err));
-    }
-  }, [user]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  async function respond(matchId: string, decision: 'accepted' | 'rejected') {
+  function respond(matchId: string, decision: 'accepted' | 'rejected') {
     if (!user) return;
     setBusyId(matchId);
-    setError(null);
-    try {
-      await respondToMatch(matchId, user.id, decision);
-      await load();
-    } catch (err) {
-      setError(formatError(err));
-    } finally {
-      setBusyId(null);
-    }
+    respondMutation.mutate(
+      { matchId, decision },
+      { onSettled: () => setBusyId(null) },
+    );
   }
 
   const invitations =
@@ -67,7 +54,7 @@ export function RecordMatchPage() {
         </div>
       )}
 
-      {matches === null ? (
+      {isLoading && !matches ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-500">Loading…</p>
       ) : (
         <>

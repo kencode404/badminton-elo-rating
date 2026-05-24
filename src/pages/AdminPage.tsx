@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { formatError } from '../lib/errors';
 import { ANONYMOUS_ID } from '../lib/anonymous';
-import type { Database, MatchType, Team } from '../lib/database.types';
+import {
+  useAdminMatchAction,
+  useAwaitingAdminMatches,
+} from '../lib/queries';
+import type { Database } from '../lib/database.types';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 type ProfileLite = Pick<
@@ -113,111 +117,22 @@ export function AdminPage() {
 // gate is the abuse-prevention layer for the anonymous feature.
 // ---------------------------------------------------------------------------
 
-interface PendingAnon {
-  match_id: string;
-  match_type: MatchType;
-  score_a: number;
-  score_b: number;
-  created_at: string;
-  creator_name: string;
-  team_a: { user_id: string; display_name: string }[];
-  team_b: { user_id: string; display_name: string }[];
-}
-
 function AnonymousApprovalCard() {
-  const [rows, setRows] = useState<PendingAnon[] | null>(null);
+  const { data: rows, isPending, error: queryError } = useAwaitingAdminMatches();
+  const actionMutation = useAdminMatchAction();
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const error = queryError
+    ? formatError(queryError)
+    : actionMutation.error
+      ? formatError(actionMutation.error)
+      : null;
 
-  const load = useCallback(async () => {
-    setError(null);
-    // Fetch awaiting_admin matches. The migration's RLS update lets
-    // admins read these even when they're not participants.
-    const { data: matches, error: e1 } = await supabase
-      .from('matches')
-      .select('id, match_type, score_a, score_b, played_at, created_by')
-      .eq('status', 'awaiting_admin')
-      .order('played_at', { ascending: false });
-    if (e1) {
-      setError(formatError(e1));
-      return;
-    }
-    if (!matches || matches.length === 0) {
-      setRows([]);
-      return;
-    }
-    const ids = matches.map((m) => m.id);
-    const creatorIds = Array.from(new Set(matches.map((m) => m.created_by)));
-
-    const [{ data: parts, error: e2 }, { data: profs, error: e3 }] =
-      await Promise.all([
-        supabase
-          .from('match_participants')
-          .select('match_id, user_id, team, profiles:user_id(display_name)')
-          .in('match_id', ids),
-        supabase
-          .from('profiles')
-          .select('id, display_name')
-          .in('id', creatorIds),
-      ]);
-    if (e2 || e3) {
-      setError(formatError(e2 ?? e3));
-      return;
-    }
-
-    type PartRow = {
-      match_id: string;
-      user_id: string;
-      team: Team;
-      profiles: { display_name: string } | null;
-    };
-    const partsCast = (parts ?? []) as unknown as PartRow[];
-    const creatorMap = new Map(
-      (profs ?? []).map((p) => [p.id, p.display_name]),
-    );
-
-    const built: PendingAnon[] = matches.map((m) => {
-      const mine = partsCast.filter((p) => p.match_id === m.id);
-      const map = (team: Team) =>
-        mine
-          .filter((p) => p.team === team)
-          .map((p) => ({
-            user_id: p.user_id,
-            display_name:
-              p.user_id === ANONYMOUS_ID
-                ? 'Anonymous'
-                : p.profiles?.display_name ?? 'Unknown',
-          }));
-      return {
-        match_id: m.id,
-        match_type: m.match_type as MatchType,
-        score_a: m.score_a,
-        score_b: m.score_b,
-        created_at: m.played_at,
-        creator_name: creatorMap.get(m.created_by) ?? 'Unknown',
-        team_a: map('A'),
-        team_b: map('B'),
-      };
-    });
-    setRows(built);
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  async function act(matchId: string, action: 'approve' | 'reject') {
+  function act(matchId: string, action: 'approve' | 'reject') {
     setBusyId(matchId);
-    setError(null);
-    const fn =
-      action === 'approve' ? 'approve_anonymous_match' : 'reject_anonymous_match';
-    const { error } = await supabase.rpc(fn, { p_match_id: matchId });
-    setBusyId(null);
-    if (error) {
-      setError(formatError(error));
-      return;
-    }
-    await load();
+    actionMutation.mutate(
+      { matchId, action },
+      { onSettled: () => setBusyId(null) },
+    );
   }
 
   return (
@@ -240,9 +155,9 @@ function AnonymousApprovalCard() {
         </div>
       )}
 
-      {rows === null ? (
+      {isPending && !rows ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-500">Loading…</p>
-      ) : rows.length === 0 ? (
+      ) : !rows || rows.length === 0 ? (
         <p className="text-xs font-mono tracking-widest uppercase text-zinc-500 dark:text-zinc-500">
           No matches awaiting approval.
         </p>

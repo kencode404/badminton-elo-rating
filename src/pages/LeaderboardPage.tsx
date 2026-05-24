@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { supabase } from '../lib/supabase';
 import { formatError } from '../lib/errors';
 import { ProfileDetailModal } from '../components/ProfileDetailModal';
 import { TierBadge } from '../components/TierBadge';
 import { ratingStatus, PLACEMENT_GAMES, TIERS, type RatingStatus } from '../lib/tiers';
+import { useLeaderboard, useWinStreaks } from '../lib/queries';
 import type { Database } from '../lib/database.types';
 
 type Tab = 'singles' | 'doubles';
@@ -16,73 +16,29 @@ export function LeaderboardPage() {
   const [searchParams] = useSearchParams();
   const previewMode = searchParams.get('preview') === 'tiers';
   const [tab, setTab] = useState<Tab>('doubles');
-  const [rows, setRows] = useState<Profile[] | null>(null);
-  const [streaks, setStreaks] = useState<Map<string, { singles: number; doubles: number }>>(new Map());
-  const [error, setError] = useState<string | null>(null);
   const [openUserId, setOpenUserId] = useState<string | null>(null);
+
+  const { data: rows, error: rowsError, isLoading } = useLeaderboard(tab);
+  const { data: streakRows } = useWinStreaks();
+  const error = rowsError ? formatError(rowsError) : null;
+
+  // get_win_streaks returns an array; map for O(1) lookup below.
+  const streaks = useMemo(() => {
+    const m = new Map<string, { singles: number; doubles: number }>();
+    for (const row of streakRows ?? []) {
+      m.set(row.user_id, {
+        singles: row.singles_streak ?? 0,
+        doubles: row.doubles_streak ?? 0,
+      });
+    }
+    return m;
+  }, [streakRows]);
 
   const displayedRows = useMemo(() => {
     if (!rows) return null;
     if (!previewMode) return rows;
-    // Prepend mock players (one per tier + a placement player) so all
-    // row styling can be inspected on a freshly-seeded club. Real
-    // rows still render below the mocks.
     return [...buildPreviewRows(tab), ...rows];
   }, [rows, tab, previewMode]);
-
-  useEffect(() => {
-    let active = true;
-    setRows(null);
-    setError(null);
-    const ratingCol = tab === 'singles' ? 'singles_rating' : 'doubles_rating';
-    const gamesCol = tab === 'singles' ? 'singles_games_played' : 'doubles_games_played';
-    supabase
-      .from('profiles')
-      .select('*')
-      .eq('is_banned', false)
-      .eq('is_anonymous', false)
-      .order(ratingCol, { ascending: false })
-      .order(gamesCol, { ascending: false })
-      .order('display_name', { ascending: true })
-      .limit(100)
-      .then(({ data, error }) => {
-        if (!active) return;
-        if (error) setError(formatError(error));
-        else setRows(data ?? []);
-      });
-    return () => {
-      active = false;
-    };
-  }, [tab]);
-
-  // Streaks are computed per mode by the RPC; fetch once.
-  useEffect(() => {
-    let active = true;
-    supabase
-      .rpc('get_win_streaks')
-      .then(({ data, error }) => {
-        if (!active) return;
-        if (error) {
-          // Non-fatal — leaderboard still works without streak badges.
-          return;
-        }
-        const map = new Map<string, { singles: number; doubles: number }>();
-        for (const row of (data ?? []) as {
-          user_id: string;
-          singles_streak: number;
-          doubles_streak: number;
-        }[]) {
-          map.set(row.user_id, {
-            singles: row.singles_streak ?? 0,
-            doubles: row.doubles_streak ?? 0,
-          });
-        }
-        setStreaks(map);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   return (
     <div className="p-4 space-y-4">
@@ -116,9 +72,9 @@ export function LeaderboardPage() {
         </div>
       )}
 
-      {displayedRows === null ? (
+      {isLoading && !displayedRows ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-500">Loading…</p>
-      ) : displayedRows.length === 0 ? (
+      ) : !displayedRows || displayedRows.length === 0 ? (
         <section className="glass-panel p-6 text-center">
           <div className="text-3xl mb-2 text-cyan2-400" aria-hidden>✦</div>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
