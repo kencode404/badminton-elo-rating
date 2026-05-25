@@ -217,8 +217,9 @@ function Row({
           )}
           {isMe && <span className="text-[9px] tracking-widest ml-1">· you</span>}
         </div>
-        <div className="text-[10px] text-zinc-500 dark:text-zinc-500 tracking-wider uppercase mt-0.5">
-          {games} {games === 1 ? 'game' : 'games'}
+        <div className="text-[10px] text-zinc-500 dark:text-zinc-500 tracking-wider uppercase mt-0.5 flex items-center gap-1.5">
+          <span>{games} {games === 1 ? 'game' : 'games'}</span>
+          <ArmedIcons profile={profile} />
         </div>
       </div>
 
@@ -237,6 +238,51 @@ function Row({
         </div>
       </button>
     </li>
+  );
+}
+
+// Small icons appended to the games count when a player owns an
+// armed shield or booster. Both can show at once (separate slots).
+// Tooltip via title attr names which item is armed.
+function ArmedIcons({ profile }: { profile: Profile }) {
+  const shieldSrc =
+    profile.armed_shield === 'iron'
+      ? '/Titanium-shield.png'
+      : profile.armed_shield === 'aura'
+        ? '/Vibranium-shield.png'
+        : null;
+  const shieldTitle =
+    profile.armed_shield === 'iron'
+      ? 'Titanium Shield armed'
+      : profile.armed_shield === 'aura'
+        ? 'Vibranium Shield armed'
+        : '';
+  const boosterSrc =
+    profile.armed_booster === 'shuttle' ? '/Platinum-shuttlecock.png' : null;
+  const boosterTitle =
+    profile.armed_booster === 'shuttle' ? 'Shuttle Strike armed' : '';
+  if (!shieldSrc && !boosterSrc) return null;
+  return (
+    <span className="inline-flex items-center gap-1 ml-0.5">
+      {shieldSrc && (
+        <img
+          src={shieldSrc}
+          alt=""
+          title={shieldTitle}
+          className="w-4 h-4 object-contain"
+          aria-label={shieldTitle}
+        />
+      )}
+      {boosterSrc && (
+        <img
+          src={boosterSrc}
+          alt=""
+          title={boosterTitle}
+          className="w-4 h-4 object-contain"
+          aria-label={boosterTitle}
+        />
+      )}
+    </span>
   );
 }
 
@@ -379,16 +425,31 @@ function tierBadgeSize(status: RatingStatus): number {
 }
 
 // Mock leaderboard rows used by ?preview=tiers — one player per tier
-// (Bronze → Predator) plus a placement player, so all row styling can
-// be inspected even when the real leaderboard only has Silver players.
+// (Bronze → Predator) plus a placement player. Each is seeded with a
+// different shield/booster combo so the new armed-item icons next to
+// the games count are exercised across the page:
+//   Predator  → Vibranium + Shuttle Strike (both armed)
+//   Diamond   → Vibranium only
+//   Gold      → Titanium only
+//   Silver    → Shuttle Strike only
+//   Bronze    → nothing armed
+//   Placement → nothing armed
 function buildPreviewRows(tab: Tab): Profile[] {
-  const samples: Array<{ id: string; name: string; rating: number; games: number }> = [
-    { id: 'preview-predator', name: '[Preview] Predator', rating: 1780, games: 80 },
-    { id: 'preview-diamond',  name: '[Preview] Diamond', rating: 1500, games: 50 },
-    { id: 'preview-gold',     name: '[Preview] Gold',    rating: 1325, games: 30 },
-    { id: 'preview-silver',   name: '[Preview] Silver',  rating: 1175, games: 18 },
-    { id: 'preview-bronze',   name: '[Preview] Bronze',  rating: 1040, games: 12 },
-    { id: 'preview-placement',name: '[Preview] Newbie',  rating: 1000, games: 2 },
+  type Sample = {
+    id: string;
+    name: string;
+    rating: number;
+    games: number;
+    armed_shield: 'iron' | 'aura' | null;
+    armed_booster: 'shuttle' | null;
+  };
+  const samples: Sample[] = [
+    { id: 'preview-predator', name: '[Preview] Predator', rating: 1780, games: 80, armed_shield: 'aura', armed_booster: 'shuttle' },
+    { id: 'preview-diamond',  name: '[Preview] Diamond',  rating: 1500, games: 50, armed_shield: 'aura', armed_booster: null },
+    { id: 'preview-gold',     name: '[Preview] Gold',     rating: 1325, games: 30, armed_shield: 'iron', armed_booster: null },
+    { id: 'preview-silver',   name: '[Preview] Silver',   rating: 1175, games: 18, armed_shield: null,   armed_booster: 'shuttle' },
+    { id: 'preview-bronze',   name: '[Preview] Bronze',   rating: 1040, games: 12, armed_shield: null,   armed_booster: null },
+    { id: 'preview-placement',name: '[Preview] Newbie',   rating: 1000, games: 2,  armed_shield: null,   armed_booster: null },
   ];
   const isSingles = tab === 'singles';
   return samples.map((s) => ({
@@ -411,8 +472,8 @@ function buildPreviewRows(tab: Tab): Profile[] {
     banned_reason: null,
     is_anonymous: false,
     shards: 0,
-    armed_shield: null,
-    armed_booster: null,
+    armed_shield: s.armed_shield,
+    armed_booster: s.armed_booster,
   }));
 }
 
