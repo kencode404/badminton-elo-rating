@@ -51,6 +51,11 @@ export function useMyMatches(userId: string | undefined) {
     queryKey: userId ? qk.myMatches(userId) : ['my-matches', 'anon'],
     queryFn: () => getMyMatches(userId!),
     enabled: !!userId,
+    // Always refetch when /record mounts — catches new invitations
+    // someone else submitted while we were away, and picks up
+    // status flips (e.g. match moved to History after the admin
+    // approved an anonymous-tainted match we were a participant in).
+    refetchOnMount: 'always',
   });
 }
 
@@ -171,6 +176,11 @@ export function useMyProfile(userId: string | undefined) {
       };
     },
     enabled: !!userId,
+    // Shard balance + armed items change every time a match settles —
+    // a settle from another participant's accept can move our balance
+    // and consume our shield without any local action. Always refetch
+    // on /shop mount so we see those.
+    refetchOnMount: 'always',
   });
 }
 
@@ -272,6 +282,7 @@ export function useLeaderboard(tab: 'singles' | 'doubles') {
       if (error) throw error;
       return (data ?? []) as Profile[];
     },
+    refetchOnMount: 'always',
   });
 }
 
@@ -290,6 +301,7 @@ export function useWinStreaks() {
       if (error) throw error;
       return (data ?? []) as StreakRow[];
     },
+    refetchOnMount: 'always',
   });
 }
 
@@ -312,6 +324,7 @@ export function useAwaitingAdminMatches(enabled = true) {
   return useQuery({
     queryKey: qk.awaitingAdmin(),
     enabled,
+    refetchOnMount: 'always',
     queryFn: async (): Promise<AwaitingAdminMatch[]> => {
       const { data: matches, error: e1 } = await supabase
         .from('matches')
