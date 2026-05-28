@@ -7,9 +7,12 @@ import {
 import { supabase } from './supabase';
 import {
   getMyMatches,
+  recordMatchOnlineOrQueue,
   respondToMatch,
+  type CreateMatchInput,
   type MatchSummary,
 } from './matches';
+import { ANONYMOUS_ID } from './anonymous';
 import type { Database } from './database.types';
 
 // Central query/mutation hooks. All hot paths route through here so:
@@ -51,10 +54,34 @@ export function useMyMatches(userId: string | undefined) {
   });
 }
 
-// Accept or reject a pending match invitation. Optimistically flips the
-// caller's confirmation in cache so the invitation card disappears and
-// it moves into the right lane (pending / history) without waiting for
-// the round trip.
+// Submit a new match for confirmation. Wraps the existing online-or-
+// queue helper and invalidates the caller's match list so the new
+// pending match appears in /record immediately (instead of requiring
+// a refresh).
+export function useCreateMatch(userId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: {
+      input: CreateMatchInput;
+      participantNames: string[];
+    }) => {
+      return recordMatchOnlineOrQueue(vars.input, vars.participantNames);
+    },
+    onSuccess: () => {
+      if (!userId) return;
+      qc.invalidateQueries({ queryKey: qk.myMatches(userId) });
+    },
+  });
+}
+
+// Accept or reject a pending match invitation. Predicts the post-
+// settle state client-side so the row lands directly in its final
+// lane (Awaiting → Pending → History) on the first render, instead
+// of flashing through intermediate states from a server refetch.
+//
+// We deliberately do NOT invalidate the cache after success — the
+// optimistic state IS the final state. The previous flow's refetch
+// caused the same flicker the chat-reaction fix solved.
 export function useRespondToMatch(userId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
@@ -70,13 +97,31 @@ export function useRespondToMatch(userId: string | undefined) {
       const key = qk.myMatches(userId);
       await qc.cancelQueries({ queryKey: key });
       const prev = qc.getQueryData<MatchSummary[]>(key);
-      // Patch our confirmation immediately. If it's a reject, also
-      // flip the match status so the row leaves "pending" → history.
+
       qc.setQueryData<MatchSummary[]>(key, (curr) =>
         (curr ?? []).map((m) => {
           if (m.match.id !== vars.matchId) return m;
-          const newStatus =
-            vars.decision === 'rejected' ? 'rejected' : m.match.status;
+
+          // Predict the new match.status mirroring server-side
+          // settle_match: one accept per team is enough to settle.
+          // Anonymous tainted → awaiting_admin. Any reject kills it.
+          let newStatus = m.match.status;
+          if (vars.decision === 'rejected') {
+            newStatus = 'rejected';
+          } else {
+            const myTeam = m.myTeam;
+            const otherTeam = myTeam === 'A' ? 'B' : 'A';
+            const otherTeamAccepted = m.participants.some(
+              (p) => p.team === otherTeam && p.confirmation === 'accepted',
+            );
+            if (otherTeamAccepted) {
+              const hasAnonymous = m.participants.some(
+                (p) => p.user_id === ANONYMOUS_ID,
+              );
+              newStatus = hasAnonymous ? 'awaiting_admin' : 'confirmed';
+            }
+          }
+
           return {
             ...m,
             myConfirmation: vars.decision,
@@ -91,15 +136,11 @@ export function useRespondToMatch(userId: string | undefined) {
     },
     onError: (_err, _vars, ctx) => {
       if (!userId) return;
-      // Roll back on failure
       qc.setQueryData(qk.myMatches(userId), ctx?.prev);
     },
-    onSettled: () => {
-      if (!userId) return;
-      // Always refetch to pick up any settle-trigger side effects
-      // (ELO deltas stamped onto participants, status flips, etc.)
-      qc.invalidateQueries({ queryKey: qk.myMatches(userId) });
-    },
+    // NOTE: no onSettled invalidate — the optimistic update is
+    // authoritative. rating_delta + confirmed_at are filled on the
+    // next natural refetch (page focus, navigation, or 30s staleTime).
   });
 }
 
@@ -374,9 +415,9 @@ export function useAdminMatchAction(
     onError: (_err, _vars, ctx) => {
       qc.setQueryData(qk.awaitingAdmin(), ctx?.prev);
     },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: qk.awaitingAdmin() });
-    },
+    // No onSettled invalidate — optimistic remove is authoritative
+    // (approve → status='confirmed', reject → status='rejected',
+    // either way it leaves the awaiting_admin list).
     ...options,
   });
 }

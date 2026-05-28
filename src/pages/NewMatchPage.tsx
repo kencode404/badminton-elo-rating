@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { recordMatchOnlineOrQueue } from '../lib/matches';
 import { PlayerPicker } from '../components/PlayerPicker';
 import { ANONYMOUS_ID } from '../lib/anonymous';
+import { useCreateMatch } from '../lib/queries';
 import type { Database, MatchType } from '../lib/database.types';
 
 type ProfileLite = Pick<Database['public']['Tables']['profiles']['Row'], 'id' | 'display_name' | 'avatar_url'>;
@@ -11,6 +11,7 @@ type ProfileLite = Pick<Database['public']['Tables']['profiles']['Row'], 'id' | 
 export function NewMatchPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const createMatch = useCreateMatch(user?.id);
 
   const [matchType, setMatchType] = useState<MatchType>('doubles');
   const [partner, setPartner] = useState<ProfileLite[]>([]);
@@ -61,8 +62,8 @@ export function NewMatchPage() {
         ...partner.map((p) => p.display_name),
         ...opponents.map((p) => p.display_name),
       ];
-      const result = await recordMatchOnlineOrQueue(
-        {
+      const result = await createMatch.mutateAsync({
+        input: {
           matchType,
           creatorId: user.id,
           partnerId: matchType === 'doubles' ? partner[0]?.id : undefined,
@@ -71,7 +72,7 @@ export function NewMatchPage() {
           scoreB: b,
         },
         participantNames,
-      );
+      });
       if (result.kind === 'queued') {
         navigate('/record?queued=1', { replace: true });
       } else {
