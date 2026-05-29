@@ -153,26 +153,66 @@ export function useRespondToMatch(userId: string | undefined) {
 // Current user's profile (drives ShopPage balance + armed shield)
 // ---------------------------------------------------------------------------
 
+export type PetKind = 'doux' | 'mort' | 'tard' | 'vita';
+
 export interface MyProfileLite {
   shards: number;
   armed_shield: 'iron' | 'aura' | null;
   armed_booster: 'shuttle' | null;
+  owned_pets: PetKind[];
+  equipped_pet: PetKind | null;
+  // Per-mode rating + games — needed for shop tier gates and any
+  // other client-side eligibility checks.
+  singles_rating: number;
+  singles_games_played: number;
+  doubles_rating: number;
+  doubles_games_played: number;
+  // Used to compute pending pet shards (shown in the Pet Spaces
+  // basket). Updated by claim_pet_daily() server-side.
+  pets_last_payout_at: string;
 }
 
 export function useMyProfile(userId: string | undefined) {
   return useQuery({
     queryKey: userId ? qk.myProfile(userId) : ['my-profile', 'anon'],
     queryFn: async (): Promise<MyProfileLite> => {
+      // Pet shards no longer auto-credit on profile read — the
+      // player collects them manually via the Pet Spaces basket
+      // (calls claim_pet_daily). We do still need the timestamp
+      // here so the basket can show pending shards.
       const { data, error } = await supabase
         .from('profiles')
-        .select('shards, armed_shield, armed_booster')
+        .select('shards, armed_shield, armed_booster, owned_pets, equipped_pet, singles_rating, singles_games_played, doubles_rating, doubles_games_played, pets_last_payout_at')
         .eq('id', userId!)
         .maybeSingle();
       if (error) throw error;
+      // Cast through unknown: the long .select() string trips the
+      // PostgREST type inference. Fields are real columns; types are
+      // correct here.
+      const row = (data ?? {}) as unknown as {
+        shards?: number;
+        armed_shield?: 'iron' | 'aura' | null;
+        armed_booster?: 'shuttle' | null;
+        owned_pets?: string[];
+        equipped_pet?: PetKind | null;
+        singles_rating?: number;
+        singles_games_played?: number;
+        doubles_rating?: number;
+        doubles_games_played?: number;
+        pets_last_payout_at?: string;
+      };
       return {
-        shards: data?.shards ?? 0,
-        armed_shield: (data?.armed_shield as 'iron' | 'aura' | null) ?? null,
-        armed_booster: (data?.armed_booster as 'shuttle' | null) ?? null,
+        shards: row.shards ?? 0,
+        armed_shield: row.armed_shield ?? null,
+        armed_booster: row.armed_booster ?? null,
+        owned_pets: (row.owned_pets ?? []) as PetKind[],
+        equipped_pet: row.equipped_pet ?? null,
+        singles_rating: row.singles_rating ?? 1000,
+        singles_games_played: row.singles_games_played ?? 0,
+        doubles_rating: row.doubles_rating ?? 1000,
+        doubles_games_played: row.doubles_games_played ?? 0,
+        pets_last_payout_at:
+          row.pets_last_payout_at ?? new Date().toISOString(),
       };
     },
     enabled: !!userId,
@@ -208,6 +248,98 @@ export function useBuyShield(userId: string | undefined) {
               armed_shield: kind,
             }
           : curr,
+      );
+      return { prev };
+    },
+    onError: (_err, _kind, ctx) => {
+      if (!userId) return;
+      qc.setQueryData(qk.myProfile(userId), ctx?.prev);
+    },
+    onSettled: () => {
+      if (!userId) return;
+      qc.invalidateQueries({ queryKey: qk.myProfile(userId) });
+    },
+  });
+}
+
+const PET_COST = 150;
+
+// Buy a pet — permanent unlock + auto-equip. Optimistically adds to
+// owned_pets, sets equipped_pet, deducts shards.
+export function useBuyPet(userId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (kind: PetKind) => {
+      const { data, error } = await supabase.rpc('buy_pet', { p_kind: kind });
+      if (error) throw error;
+      return data as number;
+    },
+    onMutate: async (kind) => {
+      if (!userId) return;
+      const key = qk.myProfile(userId);
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<MyProfileLite>(key);
+      qc.setQueryData<MyProfileLite>(key, (curr) =>
+        curr
+          ? {
+              ...curr,
+              shards: Math.max(0, curr.shards - PET_COST),
+              owned_pets: curr.owned_pets.includes(kind)
+                ? curr.owned_pets
+                : [...curr.owned_pets, kind],
+              // Auto-equip only when no pet currently displayed.
+              equipped_pet: curr.equipped_pet ?? kind,
+            }
+          : curr,
+      );
+      return { prev };
+    },
+    onError: (_err, _kind, ctx) => {
+      if (!userId) return;
+      qc.setQueryData(qk.myProfile(userId), ctx?.prev);
+    },
+    onSettled: () => {
+      if (!userId) return;
+      qc.invalidateQueries({ queryKey: qk.myProfile(userId) });
+    },
+  });
+}
+
+// Swap which owned pet is equipped (or unequip with null).
+// Collect accumulated daily pet shards. The basket UI in Pet Spaces
+// shows how many are pending (computed client-side from
+// pets_last_payout_at × owned-pet count). On success the server
+// credits + advances the timestamp; we refetch the profile so the
+// new balance + timestamp reflect.
+export function useClaimPetDaily(userId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc('claim_pet_daily');
+      if (error) throw error;
+      return data as number;
+    },
+    onSuccess: () => {
+      if (!userId) return;
+      qc.invalidateQueries({ queryKey: qk.myProfile(userId) });
+    },
+  });
+}
+
+export function useEquipPet(userId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (kind: PetKind | null) => {
+      const { error } = await supabase.rpc('equip_pet', { p_kind: kind });
+      if (error) throw error;
+    },
+    onMutate: async (kind) => {
+      if (!userId) return;
+      const key = qk.myProfile(userId);
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<MyProfileLite>(key);
+      qc.setQueryData<MyProfileLite>(key, (curr) =>
+        curr ? { ...curr, equipped_pet: kind } : curr,
       );
       return { prev };
     },

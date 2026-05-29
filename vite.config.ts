@@ -24,6 +24,15 @@ export default defineConfig({
         'Titanium-shield.png',
         'Vibranium-shield.png',
         'Platinum-shuttlecock.png',
+        'dragon-egg.png',
+        'dinoCharactersVersion1.1/gifs/DinoSprites_doux.gif',
+        'dinoCharactersVersion1.1/gifs/DinoSprites_mort.gif',
+        'dinoCharactersVersion1.1/gifs/DinoSprites_tard.gif',
+        'dinoCharactersVersion1.1/gifs/DinoSprites_vita.gif',
+        'dinoCharactersVersion1.1/sheets/DinoSprites - doux.png',
+        'dinoCharactersVersion1.1/sheets/DinoSprites - mort.png',
+        'dinoCharactersVersion1.1/sheets/DinoSprites - tard.png',
+        'dinoCharactersVersion1.1/sheets/DinoSprites - vita.png',
       ],
       workbox: {
         // Runtime caching for Supabase reads + avatar images so users

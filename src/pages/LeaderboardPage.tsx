@@ -286,6 +286,15 @@ function ArmedIcons({ profile }: { profile: Profile }) {
   );
 }
 
+// Equipped pet → sprite sheet under /public. We render the WALK
+// animation (frames 4-9) on the leaderboard so each pet looks like
+// it's running alongside its owner. Shop uses idle frames instead.
+function petSheetUrl(kind: string | null): string | null {
+  if (!kind) return null;
+  if (!['doux', 'mort', 'tard', 'vita'].includes(kind)) return null;
+  return `/dinoCharactersVersion1.1/sheets/DinoSprites - ${kind}.png`;
+}
+
 function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
   const showRing = streak >= 2;
   const showSparks = streak >= 4;
@@ -296,6 +305,7 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
   const ringDur =
     streak >= 4 ? '1.2s' : streak >= 3 ? '1.7s' : '2s';
   const boltCount = streak >= 5 ? 12 : 8;
+  const petSheet = petSheetUrl(profile.equipped_pet);
 
   return (
     <div className="relative shrink-0 w-9 h-9">
@@ -361,6 +371,27 @@ function Avatar({ profile, streak }: { profile: Profile; streak: number }) {
           </div>
         )}
       </div>
+      {/* Equipped pet — walk animation peeks out the bottom-right of
+          the avatar. Uses the sprite sheet + CSS keyframes so we get
+          only the 6-frame walk loop (no idle/kick/hurt). 24×24 native
+          sprite, rendered at native size. */}
+      {petSheet && (
+        <div
+          className="absolute -bottom-1.5 -right-3 w-6 h-6 z-20 pointer-events-none overflow-hidden"
+          aria-hidden
+        >
+          <div
+            className="w-6 h-6"
+            style={{
+              backgroundImage: `url("${petSheet}")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: '-96px 0',
+              imageRendering: 'pixelated',
+              animation: 'dino-move 0.5s steps(6) infinite',
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -435,6 +466,7 @@ function tierBadgeSize(status: RatingStatus): number {
 //   Bronze    → nothing armed
 //   Placement → nothing armed
 function buildPreviewRows(tab: Tab): Profile[] {
+  type PetKindLocal = 'doux' | 'mort' | 'tard' | 'vita';
   type Sample = {
     id: string;
     name: string;
@@ -442,14 +474,15 @@ function buildPreviewRows(tab: Tab): Profile[] {
     games: number;
     armed_shield: 'iron' | 'aura' | null;
     armed_booster: 'shuttle' | null;
+    equipped_pet: PetKindLocal | null;
   };
   const samples: Sample[] = [
-    { id: 'preview-predator', name: '[Preview] Predator', rating: 1780, games: 80, armed_shield: 'aura', armed_booster: 'shuttle' },
-    { id: 'preview-diamond',  name: '[Preview] Diamond',  rating: 1500, games: 50, armed_shield: 'aura', armed_booster: null },
-    { id: 'preview-gold',     name: '[Preview] Gold',     rating: 1325, games: 30, armed_shield: 'iron', armed_booster: null },
-    { id: 'preview-silver',   name: '[Preview] Silver',   rating: 1175, games: 18, armed_shield: null,   armed_booster: 'shuttle' },
-    { id: 'preview-bronze',   name: '[Preview] Bronze',   rating: 1040, games: 12, armed_shield: null,   armed_booster: null },
-    { id: 'preview-placement',name: '[Preview] Newbie',   rating: 1000, games: 2,  armed_shield: null,   armed_booster: null },
+    { id: 'preview-predator', name: '[Preview] Predator', rating: 1780, games: 80, armed_shield: 'aura', armed_booster: 'shuttle', equipped_pet: 'vita' },
+    { id: 'preview-diamond',  name: '[Preview] Diamond',  rating: 1500, games: 50, armed_shield: 'aura', armed_booster: null,      equipped_pet: 'mort' },
+    { id: 'preview-gold',     name: '[Preview] Gold',     rating: 1325, games: 30, armed_shield: 'iron', armed_booster: null,      equipped_pet: 'tard' },
+    { id: 'preview-silver',   name: '[Preview] Silver',   rating: 1175, games: 18, armed_shield: null,   armed_booster: 'shuttle', equipped_pet: 'doux' },
+    { id: 'preview-bronze',   name: '[Preview] Bronze',   rating: 1040, games: 12, armed_shield: null,   armed_booster: null,      equipped_pet: null },
+    { id: 'preview-placement',name: '[Preview] Newbie',   rating: 1000, games: 2,  armed_shield: null,   armed_booster: null,      equipped_pet: null },
   ];
   const isSingles = tab === 'singles';
   return samples.map((s) => ({
@@ -474,6 +507,8 @@ function buildPreviewRows(tab: Tab): Profile[] {
     shards: 0,
     armed_shield: s.armed_shield,
     armed_booster: s.armed_booster,
+    owned_pets: s.equipped_pet ? [s.equipped_pet] : [],
+    equipped_pet: s.equipped_pet,
   }));
 }
 

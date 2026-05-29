@@ -44,6 +44,8 @@ export interface Database {
           shards: number;
           armed_shield: 'iron' | 'aura' | null;
           armed_booster: 'shuttle' | null;
+          owned_pets: string[];
+          equipped_pet: 'doux' | 'mort' | 'tard' | 'vita' | null;
         };
         Insert: {
           id: string;
@@ -66,6 +68,8 @@ export interface Database {
           shards?: number;
           armed_shield?: 'iron' | 'aura' | null;
           armed_booster?: 'shuttle' | null;
+          owned_pets?: string[];
+          equipped_pet?: 'doux' | 'mort' | 'tard' | 'vita' | null;
         };
         Update: {
           display_name?: string;
@@ -87,6 +91,8 @@ export interface Database {
           shards?: number;
           armed_shield?: 'iron' | 'aura' | null;
           armed_booster?: 'shuttle' | null;
+          owned_pets?: string[];
+          equipped_pet?: 'doux' | 'mort' | 'tard' | 'vita' | null;
         };
         Relationships: [];
       };
@@ -304,6 +310,18 @@ export interface Database {
       };
       buy_booster: {
         Args: { p_kind: 'shuttle' };
+        Returns: number;
+      };
+      buy_pet: {
+        Args: { p_kind: 'doux' | 'mort' | 'tard' | 'vita' };
+        Returns: number;
+      };
+      equip_pet: {
+        Args: { p_kind: 'doux' | 'mort' | 'tard' | 'vita' | null };
+        Returns: void;
+      };
+      claim_pet_daily: {
+        Args: Record<PropertyKey, never>;
         Returns: number;
       };
     };

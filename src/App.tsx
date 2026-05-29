@@ -8,6 +8,7 @@ import { EditMatchPage } from './pages/EditMatchPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { AdminPage } from './pages/AdminPage';
 import { ShopPage } from './pages/ShopPage';
+import { PetSpacesPage } from './pages/PetSpacesPage';
 import { ScoringGuidePage } from './pages/ScoringGuidePage';
 import { SignInPage } from './pages/SignInPage';
 import { SignUpPage } from './pages/SignUpPage';
@@ -31,6 +32,7 @@ export function App() {
         <Route path="/record/new" element={<NewMatchPage />} />
         <Route path="/record/:matchId/edit" element={<EditMatchPage />} />
         <Route path="/shop" element={<ShopPage />} />
+        <Route path="/pets" element={<PetSpacesPage />} />
         <Route path="/scoring-guide" element={<ScoringGuidePage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/admin" element={<AdminPage />} />

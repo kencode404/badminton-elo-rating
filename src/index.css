@@ -52,6 +52,110 @@
   }
 }
 
+/* Dragon-egg nest — soft blue halo that grows and fades behind the
+   egg PNG to suggest pent-up loot. Same recipe as the vibranium
+   halo but tuned slightly bigger so the egg sits in a glow. */
+@keyframes dragon-egg-halo {
+  0%, 100% {
+    transform: scale(0.85);
+    opacity: 0.65;
+  }
+  50% {
+    transform: scale(1.6);
+    opacity: 0.15;
+  }
+}
+
+/* Shard fly-to-shop effect — coin spawns at the dragon-nest button
+   and translates to the Shop tab in the bottom nav. Source/target
+   positions come in as CSS variables. Slight scale + fade at the
+   end gives the arrive-and-vanish feel. */
+@keyframes shard-fly {
+  0% {
+    transform: translate(var(--from-x), var(--from-y)) scale(1);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--to-x), var(--to-y)) scale(0.35);
+    opacity: 0;
+  }
+}
+
+/* Dino pets — sprite-sheet idle loop. Steps through the first 4
+   frames only (the breathing idle), skipping the walk/kick/hurt
+   animations that ship in the same sheet. 4 frames × 24px native
+   sprite width = 96px scroll distance. Each pet uses its own
+   sheet via inline background-image. */
+@keyframes dino-idle {
+  to {
+    background-position: -96px 0;
+  }
+}
+
+/* Dino pets — sprite-sheet walk/move loop. Frames 4-9 in the sheet
+   (the 6 walking frames). Starts at -96px (skipping idle) and ends
+   at -240px (-96 + 6 × 24). Pair with steps(6). */
+@keyframes dino-move {
+  from {
+    background-position: -96px 0;
+  }
+  to {
+    background-position: -240px 0;
+  }
+}
+
+/* Dino pets — sprite-sheet hurt reaction. Frames 13-16 (4 frames),
+   played once when the user pokes the dino. Starts at -312px
+   (13 × 24) and ends at -408px (-312 + 4 × 24). Pair with steps(4)
+   and iteration-count: 1. */
+@keyframes dino-hurt {
+  from {
+    background-position: -312px 0;
+  }
+  to {
+    background-position: -408px 0;
+  }
+}
+
+/* Dino pets — kick / action burst. Frames 10-12 (3 frames). One-shot
+   accent during otherwise idle phases. Pair with steps(3) and
+   iteration-count: 1. */
+@keyframes dino-kick {
+  from {
+    background-position: -240px 0;
+  }
+  to {
+    background-position: -312px 0;
+  }
+}
+
+/* Dino pets — sneak loop. Frames 17-20 (4 frames). Faster traversal
+   variant used when the pet is "moving fast" (low-and-quiet style).
+   Pair with steps(4). */
+@keyframes dino-sneak {
+  from {
+    background-position: -408px 0;
+  }
+  to {
+    background-position: -504px 0;
+  }
+}
+
+/* Dino pets — crouch loop. Frames 21-23 (3 frames). The other "fast"
+   variant — alternated with sneak for visual variety. Pair with
+   steps(3). */
+@keyframes dino-crouch {
+  from {
+    background-position: -504px 0;
+  }
+  to {
+    background-position: -576px 0;
+  }
+}
+
 /* Predator-tier row glow on the leaderboard. Pulses the red aura
    that's set inline as box-shadow. */
 @keyframes pulse-glow {

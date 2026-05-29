@@ -324,6 +324,48 @@ export function ProfilePage() {
         )}
       </section>
 
+      <Link
+        to="/pets"
+        className="glass-panel w-full p-4 flex items-center justify-between border-cyan2-400/40 dark:border-cyan2-500/30 border-dashed hover:border-cyan2-400/80 transition group"
+      >
+        <div className="flex items-center gap-3">
+          <span
+            className="w-9 h-9 rounded-lg flex items-center justify-center border border-cyan2-400/40 overflow-hidden"
+            style={{
+              background: 'linear-gradient(135deg, #0e2f53 0%, #18181b 100%)',
+            }}
+            aria-hidden
+          >
+            {profile?.equipped_pet ? (
+              <div
+                style={{
+                  width: 24,
+                  height: 24,
+                  backgroundImage: `url("/dinoCharactersVersion1.1/sheets/DinoSprites - ${profile.equipped_pet}.png")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: '0 0',
+                  imageRendering: 'pixelated',
+                  animation: 'dino-idle 0.6s steps(4) infinite',
+                }}
+              />
+            ) : (
+              <span className="text-cyan2-400/70 text-base leading-none">◇</span>
+            )}
+          </span>
+          <div className="text-left">
+            <div className="font-display uppercase tracking-widest text-cyan2-500 dark:text-cyan2-300 text-sm">
+              Pet Spaces
+            </div>
+            <div className="text-[10px] text-zinc-500 dark:text-zinc-500 uppercase tracking-widest mt-0.5">
+              Equip & play
+            </div>
+          </div>
+        </div>
+        <span className="text-zinc-400 dark:text-zinc-600 group-hover:text-cyan2-400 transition" aria-hidden>
+          →
+        </span>
+      </Link>
+
       {previewMode && (
         <section className="glass-panel p-5">
           <div className="text-[10px] font-display tracking-widest uppercase text-cyan2-500 dark:text-cyan2-300 bg-cyan2-500/5 border border-cyan2-400/30 rounded-md px-3 py-2 mb-3">
@@ -446,6 +488,7 @@ export function ProfilePage() {
     </div>
   );
 }
+
 
 function Stat({
   label,
