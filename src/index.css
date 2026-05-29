@@ -84,6 +84,21 @@
   }
 }
 
+/* Dragon-egg wiggle — fires when eggs are available to sell. The
+   shake is compressed into the last quarter of the loop so the egg
+   stays mostly still and visibly wobbles every couple of seconds. */
+@keyframes dragon-egg-shake {
+  0%, 72%, 100% {
+    transform: rotate(0deg);
+  }
+  76% { transform: rotate(-8deg); }
+  80% { transform: rotate(8deg); }
+  84% { transform: rotate(-6deg); }
+  88% { transform: rotate(6deg); }
+  92% { transform: rotate(-3deg); }
+  96% { transform: rotate(0deg); }
+}
+
 /* Dino pets — sprite-sheet idle loop. Steps through the first 4
    frames only (the breathing idle), skipping the walk/kick/hurt
    animations that ship in the same sheet. 4 frames × 24px native

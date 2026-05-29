@@ -183,12 +183,6 @@ export function PetSpacesPage() {
         </section>
       ) : (
         <section className="glass-panel p-4 space-y-3">
-          <PetNestBasket
-            pending={pendingShards}
-            busy={claimMutation.isPending}
-            onCollect={collect}
-          />
-
           <PetEffectSummary owned={ordered} deployed={equippedPet} />
 
           {/* Deploy selector strip — choose which owned pet appears
@@ -213,8 +207,15 @@ export function PetSpacesPage() {
             ))}
           </div>
 
-          {/* Playground — every owned pet wanders independently */}
-          <PetPlayground pets={ordered} deployed={equippedPet} />
+          {/* Playground — every owned pet wanders independently +
+              the dragon-nest egg sits in the bottom-right corner. */}
+          <PetPlayground
+            pets={ordered}
+            deployed={equippedPet}
+            pendingEggs={pendingShards}
+            busy={claimMutation.isPending}
+            onSell={collect}
+          />
         </section>
       )}
 
@@ -281,93 +282,6 @@ function PetEffectSummary({
   );
 }
 
-// Pet nest basket — your pets lay eggs over time (passive income).
-// The whole basket is the sell-eggs button: trade all eggs for
-// shards 1:1 (server enforces via claim_pet_daily). Eggs visually
-// scatter inside the basket; up to 8 distinct sprites, then a
-// "+N" count to keep the layout tight.
-function PetNestBasket({
-  pending,
-  busy,
-  onCollect,
-}: {
-  pending: number;
-  busy: boolean;
-  onCollect: () => void;
-}) {
-  const hasPending = pending > 0;
-  return (
-    <button
-      type="button"
-      onClick={onCollect}
-      disabled={busy || !hasPending}
-      className={`relative w-full rounded-lg border px-3 py-3 transition text-left ${
-        hasPending
-          ? 'border-amber-400/60 bg-gradient-to-b from-amber-500/10 to-amber-700/10 hover:from-amber-500/15 hover:to-amber-700/15 cursor-pointer'
-          : 'border-zinc-300 dark:border-zinc-700 bg-zinc-100/30 dark:bg-zinc-900/40 cursor-not-allowed opacity-70'
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        {/* Dragon egg with a growing blue halo behind it. Egg count
-            is shown as a small badge instead of multiple sprites. */}
-        <div className="relative shrink-0 w-24 h-24 flex items-center justify-center">
-          {hasPending && (
-            <div
-              className="absolute rounded-full pointer-events-none"
-              style={{
-                inset: '-8px',
-                background:
-                  'radial-gradient(circle, rgba(96, 165, 250, 0.7) 0%, rgba(59, 130, 246, 0.4) 40%, transparent 70%)',
-                filter: 'blur(8px)',
-                animation: 'dragon-egg-halo 2.4s ease-in-out infinite',
-              }}
-              aria-hidden
-            />
-          )}
-          <img
-            src="/dragon-egg.png"
-            alt=""
-            data-shard-source
-            className={`relative w-20 h-20 object-contain ${
-              hasPending ? '' : 'opacity-40'
-            }`}
-            aria-hidden
-          />
-          {pending > 0 && (
-            <span className="absolute top-0 right-0 text-[10px] font-display tracking-widest text-amber-500 dark:text-amber-300 bg-zinc-900/85 border border-amber-400/50 rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 z-10">
-              {pending > 99 ? '99+' : pending}
-            </span>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-[10px] font-display tracking-widest uppercase text-zinc-500 dark:text-zinc-400">
-            Dragon Nest
-          </div>
-          {hasPending ? (
-            <>
-              <div className="text-[11px] text-zinc-700 dark:text-zinc-300">
-                <span className="font-display text-amber-500 dark:text-amber-400">
-                  {pending}
-                </span>{' '}
-                egg{pending === 1 ? '' : 's'} ready
-              </div>
-              <div className="inline-flex items-center gap-1.5 mt-1 text-[11px] font-display tracking-widest uppercase text-amber-500 dark:text-amber-300">
-                {busy ? 'Selling…' : 'Sell for'}
-                <CoinIcon size={14} glow={false} />
-                {pending}
-              </div>
-            </>
-          ) : (
-            <div className="text-[11px] text-zinc-500 dark:text-zinc-500 mt-0.5">
-              Empty nest · check back tomorrow
-            </div>
-          )}
-        </div>
-      </div>
-    </button>
-  );
-}
-
 // Thumbnail in the equip-selector strip. Shows frame 0 of the sprite
 // (or an ✕ glyph for the "none" / unequip slot). Emerald ring when
 // this is the currently equipped choice.
@@ -427,21 +341,76 @@ type IdleAction = 'idle' | 'kick';
 function PetPlayground({
   pets,
   deployed,
+  pendingEggs,
+  busy,
+  onSell,
 }: {
   pets: PetKind[];
   deployed: PetKind | null;
+  pendingEggs: number;
+  busy: boolean;
+  onSell: () => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // Matches PlaygroundLandscape viewBox y where the metal floor
+  // starts. Both the container and the SVG are 300px tall so this
+  // maps 1:1 in actual pixels.
+  const FLOOR_TOP_PX = 165;
   return (
     <div
       ref={containerRef}
       className="relative rounded-lg border border-cyan2-400/30 overflow-hidden"
       style={{
-        height: 260,
-        background:
-          'linear-gradient(180deg, rgba(34, 211, 238, 0.06) 0%, rgba(15, 23, 42, 0.65) 100%)',
+        height: 300,
+        // Cabin wall — extends full width on any screen
+        background: 'linear-gradient(180deg, #0f172a 0%, #020617 100%)',
       }}
     >
+      {/* Window — fixed 10:3 aspect, centered. Sized so the bottom
+          sits just above the metal floor (12 top + 150 = 162 ≤ 165
+          floor top). Caps at 500px wide so the planets stay round
+          on desktop. */}
+      <div
+        className="absolute pointer-events-none"
+        style={{
+          top: 12,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 'min(94%, 500px)',
+          aspectRatio: '10 / 3',
+        }}
+      >
+        <SpaceWindow />
+      </div>
+
+      {/* Floor — metal strip, full width so dinos always have ground */}
+      <div
+        className="absolute inset-x-0 bottom-0 pointer-events-none"
+        style={{
+          height: 135,
+          background:
+            'linear-gradient(180deg, #1e293b 0%, #0a0a14 100%)',
+          borderTop: '1px solid rgba(103, 232, 249, 0.4)',
+        }}
+      />
+      {/* Floor perspective grid lines */}
+      <div
+        className="absolute inset-x-0 bottom-0 pointer-events-none"
+        style={{
+          height: 135,
+          backgroundImage:
+            'repeating-linear-gradient(180deg, transparent 0, transparent 17px, rgba(103, 232, 249, 0.08) 17px, rgba(103, 232, 249, 0.08) 18px)',
+        }}
+      />
+      {/* Scattered wall stars/rivets so the wide area isn't flat */}
+      <div
+        className="absolute inset-x-0 top-0 pointer-events-none"
+        style={{
+          height: 165,
+          backgroundImage:
+            'radial-gradient(circle at 5% 30%, rgba(255,255,255,0.7) 0, transparent 1.2px), radial-gradient(circle at 95% 25%, rgba(255,255,255,0.7) 0, transparent 1.2px), radial-gradient(circle at 2% 60%, rgba(255,255,255,0.5) 0, transparent 1px), radial-gradient(circle at 98% 60%, rgba(255,255,255,0.5) 0, transparent 1px)',
+        }}
+      />
       {pets.length === 0 ? (
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="text-[10px] font-display tracking-widest uppercase text-zinc-500 dark:text-zinc-500">
@@ -455,10 +424,251 @@ function PetPlayground({
             kind={p}
             isDeployed={deployed === p}
             containerRef={containerRef}
+            floorTopPx={FLOOR_TOP_PX}
           />
         ))
       )}
+
+      <NestEgg pending={pendingEggs} busy={busy} onSell={onSell} />
     </div>
+  );
+}
+
+// Dragon nest tucked in the bottom-right corner of the playground.
+// Tiny egg + tiny label + count badge; pulse halo + wiggle shake
+// only when there are eggs to sell. Tap = fire the fly-effect +
+// sell. Sprite has data-shard-source so the parent's fireFlyEffect
+// can find it.
+// Spaceship window — fixed 5:2 aspect SVG that fills its parent
+// container (which is the centered window cutout). Aspect-preserving
+// preserveAspectRatio so planets stay round on any screen width.
+function SpaceWindow() {
+  return (
+    <svg
+      className="w-full h-full"
+      preserveAspectRatio="xMidYMid meet"
+      viewBox="0 0 500 200"
+      aria-hidden
+    >
+      <defs>
+        <radialGradient id="space-view" cx="0.5" cy="0.45" r="0.9">
+          <stop offset="0%" stopColor="#1e1b4b" />
+          <stop offset="60%" stopColor="#0a0a2e" />
+          <stop offset="100%" stopColor="#020617" />
+        </radialGradient>
+        {/* Earth-y blue planet — atmosphere + ocean ramp */}
+        <radialGradient id="planet-blue" cx="0.35" cy="0.35" r="0.75">
+          <stop offset="0%" stopColor="#dbeafe" />
+          <stop offset="30%" stopColor="#60a5fa" />
+          <stop offset="65%" stopColor="#1d4ed8" />
+          <stop offset="100%" stopColor="#172554" />
+        </radialGradient>
+        {/* Ringed amber planet (Saturn-style) */}
+        <radialGradient id="planet-amber" cx="0.32" cy="0.32" r="0.75">
+          <stop offset="0%" stopColor="#fed7aa" />
+          <stop offset="50%" stopColor="#c2410c" />
+          <stop offset="100%" stopColor="#431407" />
+        </radialGradient>
+        {/* Distant nebula tint */}
+        <radialGradient id="nebula" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0%" stopColor="#a855f7" stopOpacity="0.25" />
+          <stop offset="100%" stopColor="#a855f7" stopOpacity="0" />
+        </radialGradient>
+        <clipPath id="window-clip">
+          <rect x="6" y="6" width="488" height="188" rx="26" />
+        </clipPath>
+      </defs>
+
+      {/* Window opening (clipped so planets/stars don't escape) */}
+      <rect x="6" y="6" width="488" height="188" rx="26" fill="url(#space-view)" />
+      <g clipPath="url(#window-clip)">
+        {/* Faint purple nebula off-center */}
+        <ellipse cx="180" cy="90" rx="140" ry="80" fill="url(#nebula)" />
+
+        {/* Stars — varied sizes + opacities for depth */}
+        <g fill="#ffffff">
+          <circle cx="40" cy="30" r="0.9" opacity="0.85" />
+          <circle cx="75" cy="58" r="0.6" opacity="0.55" />
+          <circle cx="118" cy="36" r="1.2" opacity="0.95" />
+          <circle cx="158" cy="55" r="0.7" opacity="0.7" />
+          <circle cx="208" cy="30" r="0.5" opacity="0.6" />
+          <circle cx="250" cy="64" r="0.9" opacity="0.85" />
+          <circle cx="302" cy="40" r="0.8" opacity="0.7" />
+          <circle cx="360" cy="52" r="1.1" opacity="0.9" />
+          <circle cx="412" cy="36" r="0.7" opacity="0.7" />
+          <circle cx="456" cy="58" r="0.5" opacity="0.55" />
+          <circle cx="34" cy="120" r="0.7" opacity="0.65" />
+          <circle cx="92" cy="148" r="0.6" opacity="0.55" />
+          <circle cx="172" cy="160" r="0.8" opacity="0.7" />
+          <circle cx="240" cy="120" r="0.5" opacity="0.5" />
+          <circle cx="328" cy="150" r="0.7" opacity="0.65" />
+          <circle cx="400" cy="130" r="0.8" opacity="0.7" />
+          <circle cx="460" cy="160" r="0.6" opacity="0.55" />
+        </g>
+
+        {/* Faint comet streak */}
+        <line
+          x1="320"
+          y1="150"
+          x2="390"
+          y2="120"
+          stroke="#67e8f9"
+          strokeWidth="0.6"
+          strokeOpacity="0.55"
+          strokeLinecap="round"
+        />
+        <circle cx="392" cy="119" r="1.4" fill="#ecfeff" />
+
+        {/* Big blue planet (left) */}
+        <circle cx="120" cy="105" r="36" fill="url(#planet-blue)" />
+        {/* Atmospheric edge glow */}
+        <circle
+          cx="120"
+          cy="105"
+          r="40"
+          fill="none"
+          stroke="#60a5fa"
+          strokeWidth="1"
+          strokeOpacity="0.4"
+        />
+        {/* Faint cloud bands */}
+        <g stroke="#ffffff" strokeOpacity="0.12" fill="none">
+          <path d="M 92 92 Q 120 80 148 92" strokeWidth="2.5" />
+          <path d="M 90 116 Q 120 108 150 116" strokeWidth="2.5" />
+        </g>
+
+        {/* Small moon orbiting blue planet */}
+        <circle cx="174" cy="76" r="6" fill="#e2e8f0" />
+        <circle cx="172" cy="74" r="2" fill="#cbd5e1" opacity="0.6" />
+
+        {/* Ringed amber planet (right) — back half of ring drawn
+            first so the planet body overlays the front half. */}
+        <g transform="rotate(-12 360 100)">
+          <path
+            d="M 318 100 A 42 7 0 0 1 402 100"
+            fill="none"
+            stroke="#fb923c"
+            strokeWidth="1.4"
+            strokeOpacity="0.6"
+          />
+        </g>
+        <circle cx="360" cy="100" r="24" fill="url(#planet-amber)" />
+        {/* Subtle banding on planet */}
+        <g stroke="#7c2d12" strokeOpacity="0.35" fill="none">
+          <path d="M 338 100 Q 360 96 382 100" strokeWidth="1" />
+          <path d="M 340 110 Q 360 107 380 110" strokeWidth="1" />
+        </g>
+        <g transform="rotate(-12 360 100)">
+          {/* Ring front half (in front of planet) */}
+          <path
+            d="M 318 100 A 42 7 0 0 0 402 100"
+            fill="none"
+            stroke="#fb923c"
+            strokeWidth="1.4"
+            strokeOpacity="0.85"
+          />
+        </g>
+      </g>
+
+      {/* Window frame — cyan accent, double-stroke for depth */}
+      <rect
+        x="6"
+        y="6"
+        width="488"
+        height="188"
+        rx="26"
+        fill="none"
+        stroke="#67e8f9"
+        strokeWidth="2.5"
+        strokeOpacity="0.55"
+      />
+      <rect
+        x="10"
+        y="10"
+        width="480"
+        height="180"
+        rx="22"
+        fill="none"
+        stroke="#22d3ee"
+        strokeWidth="0.7"
+        strokeOpacity="0.3"
+      />
+    </svg>
+  );
+}
+
+function NestEgg({
+  pending,
+  busy,
+  onSell,
+}: {
+  pending: number;
+  busy: boolean;
+  onSell: () => void;
+}) {
+  const hasPending = pending > 0;
+  return (
+    <button
+      type="button"
+      onClick={onSell}
+      disabled={busy || !hasPending}
+      aria-label={
+        hasPending
+          ? `Sell ${pending} dragon egg${pending === 1 ? '' : 's'}`
+          : 'No eggs to sell yet'
+      }
+      className={`absolute bottom-2 right-2 flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition ${
+        hasPending
+          ? 'bg-zinc-900/40 hover:bg-zinc-900/60 cursor-pointer'
+          : 'opacity-50 cursor-not-allowed'
+      }`}
+    >
+      <div className="relative w-20 h-20 flex items-center justify-center">
+        {hasPending && (
+          <div
+            className="absolute rounded-full pointer-events-none"
+            style={{
+              inset: '-8px',
+              background:
+                'radial-gradient(circle, rgba(96, 165, 250, 0.7) 0%, rgba(59, 130, 246, 0.4) 40%, transparent 70%)',
+              filter: 'blur(8px)',
+              animation: 'dragon-egg-halo 2.4s ease-in-out infinite',
+            }}
+            aria-hidden
+          />
+        )}
+        <img
+          src="/dragon-egg.png"
+          alt=""
+          data-shard-source
+          className="relative w-16 h-16 object-contain"
+          style={
+            hasPending
+              ? {
+                  animation:
+                    'dragon-egg-shake 2.4s ease-in-out infinite',
+                  transformOrigin: '50% 80%',
+                }
+              : undefined
+          }
+          aria-hidden
+        />
+        {hasPending && (
+          <span className="absolute -top-1 -right-1 text-[9px] font-display tracking-widest text-amber-500 dark:text-amber-300 bg-zinc-900/90 border border-amber-400/50 rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 z-10">
+            {pending > 99 ? '99+' : pending}
+          </span>
+        )}
+      </div>
+      <span
+        className={`text-[9px] font-display tracking-widest uppercase ${
+          hasPending
+            ? 'text-amber-500 dark:text-amber-300'
+            : 'text-zinc-500 dark:text-zinc-500'
+        }`}
+      >
+        {busy ? 'Selling…' : hasPending ? 'Tap to sell' : 'Empty'}
+      </span>
+    </button>
   );
 }
 
@@ -469,10 +679,15 @@ function Wanderer({
   kind,
   isDeployed,
   containerRef,
+  floorTopPx,
 }: {
   kind: PetKind;
   isDeployed: boolean;
   containerRef: React.RefObject<HTMLDivElement | null>;
+  // Min Y (in container pixels) where the dino is allowed to stand.
+  // Wandering targets clamp to this; drag is free but releasing
+  // above this Y triggers a fall back down to the floor.
+  floorTopPx: number;
 }) {
   const SCALE = 3;
   const SPRITE_PX = NATIVE_PX * SCALE;
@@ -483,18 +698,23 @@ function Wanderer({
   const FAST_MS = 3000;
   const HURT_MS = 400;
   const KICK_MS = 360;
-  const posRef = useRef({ x: 20, y: 20 });
-  const [pos, setPos] = useState({ x: 20, y: 20 });
+  // Initial spawn: feet on the floor line.
+  const SPAWN_Y = Math.max(0, floorTopPx - NATIVE_PX * 3);
+  const posRef = useRef({ x: 20, y: SPAWN_Y });
+  const [pos, setPos] = useState({ x: 20, y: SPAWN_Y });
   const [walkMode, setWalkMode] = useState<WalkMode | null>(null);
   const [idleAction, setIdleAction] = useState<IdleAction>('idle');
   const [facingLeft, setFacingLeft] = useState(false);
   const [isHurt, setIsHurt] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isDropping, setIsDropping] = useState(false);
   const isHurtRef = useRef(false);
   const isDraggingRef = useRef(false);
+  const isDroppingRef = useRef(false);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   isHurtRef.current = isHurt;
   isDraggingRef.current = isDragging;
+  isDroppingRef.current = isDropping;
 
   useEffect(() => {
     let timer: number | undefined;
@@ -503,8 +723,17 @@ function Wanderer({
       const c = containerRef.current;
       if (!c) return null;
       const maxX = Math.max(0, c.clientWidth - SPRITE_PX);
-      const maxY = Math.max(0, c.clientHeight - SPRITE_PX);
-      return { x: Math.random() * maxX, y: Math.random() * maxY };
+      // Y is the TOP of the sprite. Feet sit at y + SPRITE_PX.
+      // Highest stand position: feet exactly on the floor line
+      //   → top y = floorTopPx − SPRITE_PX
+      // Lowest stand position: feet at the bottom of the room
+      //   → top y = clientHeight − SPRITE_PX
+      const minY = Math.max(0, floorTopPx - SPRITE_PX);
+      const maxY = Math.max(minY, c.clientHeight - SPRITE_PX);
+      return {
+        x: Math.random() * maxX,
+        y: minY + Math.random() * (maxY - minY),
+      };
     }
 
     function pickWalkMode(): WalkMode {
@@ -515,7 +744,11 @@ function Wanderer({
     }
 
     function startWalk() {
-      if (isHurtRef.current || isDraggingRef.current) {
+      if (
+        isHurtRef.current ||
+        isDraggingRef.current ||
+        isDroppingRef.current
+      ) {
         timer = window.setTimeout(startWalk, 500);
         return;
       }
@@ -616,8 +849,30 @@ function Wanderer({
       // ignore
     }
     setIsDragging(false);
-    // Brief hurt linger after release before normal wander resumes.
-    window.setTimeout(() => setIsHurt(false), HURT_MS);
+
+    // If released above the legal stand range (feet above the
+    // floor line), drop down with a gravity-like transition. Same
+    // bounds the wander loop uses — minY = floor line minus the
+    // sprite height.
+    const c = containerRef.current;
+    const minY = Math.max(0, floorTopPx - SPRITE_PX);
+    if (c && posRef.current.y < minY) {
+      const maxY = Math.max(minY, c.clientHeight - SPRITE_PX);
+      const dropY = minY + Math.random() * (maxY - minY);
+      const dropped = { x: posRef.current.x, y: dropY };
+      posRef.current = dropped;
+      setPos(dropped);
+      setIsDropping(true);
+      // Drop duration + small linger; then resume idle.
+      const DROP_MS = 600;
+      window.setTimeout(() => {
+        setIsDropping(false);
+        setIsHurt(false);
+      }, DROP_MS + 80);
+    } else {
+      // Released inside the floor band — normal hurt linger.
+      window.setTimeout(() => setIsHurt(false), HURT_MS);
+    }
   }
 
   let animation: string;
@@ -640,8 +895,12 @@ function Wanderer({
 
   const walkDur =
     walkMode === 'walk' ? SLOW_MS : walkMode ? FAST_MS : 0;
-  const transition =
-    walkMode && !isDragging
+  const transition = isDropping
+    ? // Gravity-feel fall: starts gentle and accelerates toward
+      // the floor. cubic-bezier(0.55, 0, 0.85, 0.25) is the
+      // "ease-in" used widely for drop animations.
+      'top 600ms cubic-bezier(0.55, 0, 0.85, 0.25)'
+    : walkMode && !isDragging
       ? `left ${walkDur}ms linear, top ${walkDur}ms linear`
       : 'none';
 
