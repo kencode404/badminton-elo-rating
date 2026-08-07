@@ -353,30 +353,31 @@ function PetPlayground({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   // Matches PlaygroundLandscape viewBox y where the metal floor
-  // starts. Both the container and the SVG are 300px tall so this
-  // maps 1:1 in actual pixels.
-  const FLOOR_TOP_PX = 165;
+  // starts. The taller room gives the pets more space to roam.
+  const ROOM_HEIGHT_PX = 360;
+  const FLOOR_TOP_PX = 200;
+  const FLOOR_HEIGHT_PX = ROOM_HEIGHT_PX - FLOOR_TOP_PX;
   return (
     <div
       ref={containerRef}
       className="relative rounded-lg border border-cyan2-400/30 overflow-hidden"
       style={{
-        height: 300,
+        height: ROOM_HEIGHT_PX,
         // Cabin wall — extends full width on any screen
         background: 'linear-gradient(180deg, #0f172a 0%, #020617 100%)',
       }}
     >
       {/* Window — fixed 10:3 aspect, centered. Sized so the bottom
-          sits just above the metal floor (12 top + 150 = 162 ≤ 165
-          floor top). Caps at 500px wide so the planets stay round
+          sits just above the metal floor (14 top + 174 = 188 ≤ 200
+          floor top). Caps at 580px wide so the planets stay round
           on desktop. */}
       <div
         className="absolute pointer-events-none"
         style={{
-          top: 12,
+          top: 14,
           left: '50%',
           transform: 'translateX(-50%)',
-          width: 'min(94%, 500px)',
+          width: 'min(96%, 580px)',
           aspectRatio: '10 / 3',
         }}
       >
@@ -387,7 +388,7 @@ function PetPlayground({
       <div
         className="absolute inset-x-0 bottom-0 pointer-events-none"
         style={{
-          height: 135,
+          height: FLOOR_HEIGHT_PX,
           background:
             'linear-gradient(180deg, #1e293b 0%, #0a0a14 100%)',
           borderTop: '1px solid rgba(103, 232, 249, 0.4)',
@@ -397,7 +398,7 @@ function PetPlayground({
       <div
         className="absolute inset-x-0 bottom-0 pointer-events-none"
         style={{
-          height: 135,
+          height: FLOOR_HEIGHT_PX,
           backgroundImage:
             'repeating-linear-gradient(180deg, transparent 0, transparent 17px, rgba(103, 232, 249, 0.08) 17px, rgba(103, 232, 249, 0.08) 18px)',
         }}
@@ -406,7 +407,7 @@ function PetPlayground({
       <div
         className="absolute inset-x-0 top-0 pointer-events-none"
         style={{
-          height: 165,
+          height: FLOOR_TOP_PX,
           backgroundImage:
             'radial-gradient(circle at 5% 30%, rgba(255,255,255,0.7) 0, transparent 1.2px), radial-gradient(circle at 95% 25%, rgba(255,255,255,0.7) 0, transparent 1.2px), radial-gradient(circle at 2% 60%, rgba(255,255,255,0.5) 0, transparent 1px), radial-gradient(circle at 98% 60%, rgba(255,255,255,0.5) 0, transparent 1px)',
         }}
@@ -689,7 +690,9 @@ function Wanderer({
   // above this Y triggers a fall back down to the floor.
   floorTopPx: number;
 }) {
-  const SCALE = 3;
+  // A slightly smaller sprite gives the expanded room a more
+  // zoomed-out feel and leaves more room for each pet to wander.
+  const SCALE = 2.5;
   const SPRITE_PX = NATIVE_PX * SCALE;
   // Travel times — walk is the slow stroll, sneak/crouch are the
   // faster variants. Both bumped slower overall vs. v1; the gap
@@ -699,7 +702,7 @@ function Wanderer({
   const HURT_MS = 400;
   const KICK_MS = 360;
   // Initial spawn: feet on the floor line.
-  const SPAWN_Y = Math.max(0, floorTopPx - NATIVE_PX * 3);
+  const SPAWN_Y = Math.max(0, floorTopPx - SPRITE_PX);
   const posRef = useRef({ x: 20, y: SPAWN_Y });
   const [pos, setPos] = useState({ x: 20, y: SPAWN_Y });
   const [walkMode, setWalkMode] = useState<WalkMode | null>(null);
