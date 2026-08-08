@@ -370,36 +370,62 @@
     background-color: #0a0a0c;
   }
 
-  /* Single drifting starfield layer (GPU transform only) */
+  /* Each ambient star has its own seeded position, path, speed, and phase.
+     This feels like a living sky instead of one sliding wallpaper. */
   .starfield {
     position: relative;
     overflow: hidden;
+    isolation: isolate;
   }
-  .starfield::before {
-    content: '';
+  .starfield > main {
+    z-index: 1;
+  }
+  .starfield::before,
+  .starfield::after {
+    display: none;
+  }
+  .ambient-starfield {
     position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    height: 200%;
+    inset: 0;
+    overflow: hidden;
     pointer-events: none;
-    background-image:
-      radial-gradient(circle, rgba(160, 160, 170, 0.45) 0.8px, transparent 1.4px),
-      radial-gradient(circle, rgba(100, 100, 110, 0.35) 1px, transparent 1.6px);
-    background-size: 110px 110px, 180px 180px;
-    background-position: 12px 18px, 60px 80px;
-    background-repeat: repeat;
-    animation: starDrift 120s linear infinite;
-    will-change: transform;
+    z-index: 0;
   }
-  .dark .starfield::before {
-    background-image:
-      radial-gradient(circle, rgba(255, 255, 255, 0.85) 0.8px, transparent 1.4px),
-      radial-gradient(circle, rgba(165, 243, 252, 0.55) 1px, transparent 1.6px);
+  .ambient-star {
+    position: absolute;
+    width: var(--star-size);
+    height: var(--star-size);
+    border-radius: 9999px;
+    background: var(--star-color);
+    box-shadow:
+      0 0 4px var(--star-color),
+      0 0 12px rgba(103, 232, 249, 0.72);
+    animation: ambient-star-wander ease-in-out infinite alternate;
+    will-change: transform, opacity, filter;
   }
-  @keyframes starDrift {
-    from { transform: translateY(0); }
-    to   { transform: translateY(-50%); }
+  @keyframes ambient-star-wander {
+    0% {
+      transform: translate3d(var(--star-from-x), var(--star-from-y), 0) scale(0.35);
+      opacity: 0.16;
+      filter: brightness(0.45);
+    }
+    46% {
+      transform: translate3d(0, 0, 0) scale(var(--star-pulse));
+      opacity: 1;
+      filter: brightness(3);
+    }
+    100% {
+      transform: translate3d(var(--star-to-x), var(--star-to-y), 0) scale(0.52);
+      opacity: 0.24;
+      filter: brightness(0.65);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ambient-star {
+      animation: none;
+      opacity: 0.72;
+      filter: brightness(1.6);
+    }
   }
 
   /* Solid panel — no backdrop blur for performance */

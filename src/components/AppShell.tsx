@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { NavLink, Outlet, useSearchParams } from 'react-router-dom';
 import { NotificationBell } from './NotificationBell';
 import { RankChangeOverlay } from './RankChangeOverlay';
@@ -25,6 +25,75 @@ const sideNavRight: NavItem[] = [
   { to: '/shop', label: 'Shop', icon: <ShopIcon /> },
   { to: '/profile', label: 'Profile', icon: <UserIcon /> },
 ];
+
+interface AmbientStar {
+  x: number;
+  y: number;
+  size: number;
+  duration: number;
+  delay: number;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  pulse: number;
+  color: string;
+}
+
+function seededRandom(seed: number) {
+  let value = seed;
+  return () => {
+    value = (value * 1664525 + 1013904223) >>> 0;
+    return value / 4294967296;
+  };
+}
+
+const makeRandom = seededRandom(94139);
+const AMBIENT_STARS: AmbientStar[] = Array.from({ length: 200 }, () => {
+  const r = makeRandom;
+  const isCyan = r() > 0.74;
+  return {
+    x: r() * 100,
+    y: r() * 100,
+    size: 0.55 + r() * 1.3,
+    duration: 5 + r() * 14,
+    delay: r() * 18,
+    startX: -16 + r() * 12,
+    startY: -14 + r() * 12,
+    endX: 4 + r() * 16,
+    endY: 3 + r() * 15,
+    pulse: 1.35 + r() * 1.35,
+    color: isCyan ? 'rgba(165, 243, 252, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+  };
+});
+
+function AmbientStarfield() {
+  return (
+    <div className="ambient-starfield" aria-hidden>
+      {AMBIENT_STARS.map((star, index) => (
+        <span
+          key={index}
+          className="ambient-star"
+          style={
+            {
+              left: `${star.x}%`,
+              top: `${star.y}%`,
+              '--star-size': `${star.size}px`,
+              '--star-from-x': `${star.startX}px`,
+              '--star-from-y': `${star.startY}px`,
+              '--star-to-x': `${star.endX}px`,
+              '--star-to-y': `${star.endY}px`,
+              '--star-pulse': star.pulse,
+              '--star-color': star.color,
+              animationDuration: `${star.duration}s`,
+              animationDelay: `-${star.delay}s`,
+            } as CSSProperties
+          }
+        />
+      ))}
+    </div>
+  );
+}
 
 export function AppShell() {
   // Call useChatUnread once at the shell level — calling it inside each
@@ -92,6 +161,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-dvh flex flex-col cosmic-bg starfield">
+      <AmbientStarfield />
       <header
         className="sticky top-0 z-10 px-4 pb-3 bg-white/80 dark:bg-[#0a0a0c]/85 backdrop-blur-sm border-b border-zinc-200 dark:border-zinc-800"
         style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
@@ -115,7 +185,7 @@ export function AppShell() {
       </header>
 
       <main
-        className="flex-1 relative z-0"
+        className="flex-1 relative z-[1]"
         style={{ paddingBottom: 'calc(7.5rem + env(safe-area-inset-bottom))' }}
       >
         <Outlet />
