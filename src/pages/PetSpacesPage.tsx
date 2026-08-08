@@ -182,6 +182,7 @@ export function PetSpacesPage() {
           </p>
         </section>
       ) : (
+        <>
         <section className="glass-panel p-4 space-y-3">
           <PetEffectSummary owned={ordered} deployed={equippedPet} />
 
@@ -212,11 +213,14 @@ export function PetSpacesPage() {
           <PetPlayground
             pets={ordered}
             deployed={equippedPet}
-            pendingEggs={pendingShards}
-            busy={claimMutation.isPending}
-            onSell={collect}
           />
         </section>
+        <NestEgg
+          pending={pendingShards}
+          busy={claimMutation.isPending}
+          onSell={collect}
+        />
+        </>
       )}
 
       {/* Flying shard overlay — fixed-positioned so the coins travel
@@ -341,15 +345,9 @@ type IdleAction = 'idle' | 'kick';
 function PetPlayground({
   pets,
   deployed,
-  pendingEggs,
-  busy,
-  onSell,
 }: {
   pets: PetKind[];
   deployed: PetKind | null;
-  pendingEggs: number;
-  busy: boolean;
-  onSell: () => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   // Matches PlaygroundLandscape viewBox y where the metal floor
@@ -430,7 +428,6 @@ function PetPlayground({
         ))
       )}
 
-      <NestEgg pending={pendingEggs} busy={busy} onSell={onSell} />
     </div>
   );
 }
@@ -572,6 +569,17 @@ function SpaceWindow() {
       </g>
 
       {/* Window frame — cyan accent, double-stroke for depth */}
+      <g clipPath="url(#window-clip)">
+        <image
+          href="/space-window-deep-space.png"
+          x="-4"
+          y="2"
+          width="508"
+          height="196"
+          preserveAspectRatio="none"
+          className="space-window-photo"
+        />
+      </g>
       <rect
         x="6"
         y="6"
@@ -618,13 +626,14 @@ function NestEgg({
           ? `Sell ${pending} dragon egg${pending === 1 ? '' : 's'}`
           : 'No eggs to sell yet'
       }
-      className={`absolute bottom-2 right-2 flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition ${
+      className={`fixed right-4 z-[8] flex flex-col items-center gap-0 bg-transparent p-0 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/80 rounded-full ${
         hasPending
-          ? 'bg-zinc-900/40 hover:bg-zinc-900/60 cursor-pointer'
+          ? 'cursor-pointer hover:scale-105 active:scale-95'
           : 'opacity-50 cursor-not-allowed'
       }`}
+      style={{ bottom: 'calc(6rem + env(safe-area-inset-bottom))' }}
     >
-      <div className="relative w-20 h-20 flex items-center justify-center">
+      <div className="relative w-32 h-32 flex items-center justify-center">
         {hasPending && (
           <div
             className="absolute rounded-full pointer-events-none"
@@ -642,7 +651,7 @@ function NestEgg({
           src="/dragon-egg.png"
           alt=""
           data-shard-source
-          className="relative w-16 h-16 object-contain"
+          className="relative w-28 h-28 object-contain"
           style={
             hasPending
               ? {
@@ -655,13 +664,13 @@ function NestEgg({
           aria-hidden
         />
         {hasPending && (
-          <span className="absolute -top-1 -right-1 text-[9px] font-display tracking-widest text-amber-500 dark:text-amber-300 bg-zinc-900/90 border border-amber-400/50 rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 z-10">
+          <span className="absolute top-0 right-0 text-[10px] font-display tracking-widest text-amber-500 dark:text-amber-300 bg-zinc-900/90 border border-amber-400/50 rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1 z-10">
             {pending > 99 ? '99+' : pending}
           </span>
         )}
       </div>
       <span
-        className={`text-[9px] font-display tracking-widest uppercase ${
+        className={`-mt-1 text-[10px] font-display tracking-widest uppercase ${
           hasPending
             ? 'text-amber-500 dark:text-amber-300'
             : 'text-zinc-500 dark:text-zinc-500'

@@ -13,6 +13,28 @@
   }
 }
 
+/* Slow parallax drift for the photo-real view through the pet-room window. */
+@keyframes space-window-drift {
+  from {
+    transform: translate(-3px, -2px) scale(1.005);
+  }
+  to {
+    transform: translate(3px, 2px) scale(1.02);
+  }
+}
+
+.space-window-photo {
+  animation: space-window-drift 18s ease-in-out infinite alternate;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .space-window-photo {
+    animation: none;
+  }
+}
+
 @keyframes spark-burst {
   0% {
     transform: rotate(var(--spark-rotate)) translateY(-18px);
