@@ -479,7 +479,7 @@ function SpaceWindow() {
 
       {/* Window opening (clipped so planets/stars don't escape) */}
       <rect x="6" y="6" width="488" height="188" rx="26" fill="url(#space-view)" />
-      <g clipPath="url(#window-clip)">
+      <g clipPath="url(#window-clip)" display="none">
         {/* Faint purple nebula off-center */}
         <ellipse cx="180" cy="90" rx="140" ry="80" fill="url(#nebula)" />
 
@@ -569,6 +569,7 @@ function SpaceWindow() {
       </g>
 
       {/* Window frame — cyan accent, double-stroke for depth */}
+      <rect x="6" y="6" width="488" height="188" rx="26" fill="#020617" />
       <g clipPath="url(#window-clip)">
         <image
           href="/space-window-deep-space.png"
