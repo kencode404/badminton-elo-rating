@@ -572,7 +572,7 @@ function SpaceWindow() {
       <rect x="6" y="6" width="488" height="188" rx="26" fill="#020617" />
       <g clipPath="url(#window-clip)">
         <image
-          href="/space-window-deep-space.png"
+          href="/space-window-deep-space.jpg"
           x="-4"
           y="2"
           width="508"

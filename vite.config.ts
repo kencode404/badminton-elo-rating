@@ -25,6 +25,7 @@ export default defineConfig({
         'Vibranium-shield.png',
         'Platinum-shuttlecock.png',
         'dragon-egg.png',
+        'space-window-deep-space.jpg',
         'dinoCharactersVersion1.1/gifs/DinoSprites_doux.gif',
         'dinoCharactersVersion1.1/gifs/DinoSprites_mort.gif',
         'dinoCharactersVersion1.1/gifs/DinoSprites_tard.gif',
