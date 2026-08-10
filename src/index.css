@@ -398,8 +398,8 @@
     border-radius: 9999px;
     background: var(--star-color);
     box-shadow:
-      0 0 4px var(--star-color),
-      0 0 12px rgba(103, 232, 249, 0.72);
+      0 0 3px var(--star-color),
+      0 0 8px rgba(103, 232, 249, 0.42);
     animation: ambient-star-wander ease-in-out infinite alternate;
     will-change: transform, opacity, filter;
   }
@@ -411,8 +411,8 @@
     }
     46% {
       transform: translate3d(0, 0, 0) scale(var(--star-pulse));
-      opacity: 1;
-      filter: brightness(3);
+      opacity: 0.72;
+      filter: brightness(1.7);
     }
     100% {
       transform: translate3d(var(--star-to-x), var(--star-to-y), 0) scale(0.52);
@@ -423,8 +423,8 @@
   @media (prefers-reduced-motion: reduce) {
     .ambient-star {
       animation: none;
-      opacity: 0.72;
-      filter: brightness(1.6);
+      opacity: 0.58;
+      filter: brightness(1.25);
     }
   }
 
