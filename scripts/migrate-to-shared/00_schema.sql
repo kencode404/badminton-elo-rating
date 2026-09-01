@@ -1489,11 +1489,15 @@ begin
 
   -- Reset every profile's season-state — including banned users (the
   -- is_banned flag itself is intentionally left untouched).
+  -- `where true` is deliberate: the shared Supabase project runs the
+  -- safeupdate guard for API sessions, which rejects an UPDATE with
+  -- no WHERE clause even inside a SECURITY DEFINER function.
   update public.badminton_profiles
      set singles_rating = 1000,
          doubles_rating = 1000,
          singles_games_played = 0,
-         doubles_games_played = 0;
+         doubles_games_played = 0
+   where true;
 
   -- Stale match-derived announcements go; the season-reset moderation
   -- log line we insert below is kept (it has its own 30-day timer).
