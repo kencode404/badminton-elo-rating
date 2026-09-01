@@ -1861,7 +1861,8 @@ alter table public.badminton_match_participants
 
 do $$ begin
   alter table public.badminton_match_participants
-    drop constraint if exists match_participants_pkey;
+    drop constraint if exists match_participants_pkey,
+    drop constraint if exists badminton_match_participants_pkey;
 exception when others then null;
 end $$;
 
