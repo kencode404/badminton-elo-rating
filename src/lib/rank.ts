@@ -141,7 +141,7 @@ export function useRankChange(): {
         Date.now() - MISSED_EVENT_WINDOW_MS,
       ).toISOString();
       const { data: matches } = await supabase
-        .from('matches')
+        .from('badminton_matches')
         .select('id, match_type, confirmed_at')
         .eq('status', 'confirmed')
         .gte('confirmed_at', cutoff)
@@ -150,7 +150,7 @@ export function useRankChange(): {
       if (!matches || matches.length === 0) return null;
 
       const { data: parts } = await supabase
-        .from('match_participants')
+        .from('badminton_match_participants')
         .select('match_id, rating_before')
         .eq('user_id', user!.id)
         .in(
@@ -187,7 +187,7 @@ export function useRankChange(): {
 
     // 1) Catch-up
     supabase
-      .from('profiles')
+      .from('badminton_profiles')
       .select(
         'singles_rating, doubles_rating, singles_games_played, doubles_games_played',
       )
@@ -218,7 +218,7 @@ export function useRankChange(): {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'profiles',
+          table: 'badminton_profiles',
           filter: `id=eq.${user.id}`,
         },
         (payload) => {

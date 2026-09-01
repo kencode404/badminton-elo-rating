@@ -9,7 +9,7 @@ import { useLeaderboard, useWinStreaks } from '../lib/queries';
 import type { Database } from '../lib/database.types';
 
 type Tab = 'singles' | 'doubles';
-type Profile = Database['public']['Tables']['profiles']['Row'];
+type Profile = Database['public']['Tables']['badminton_profiles']['Row'];
 
 export function LeaderboardPage() {
   const { user } = useAuth();

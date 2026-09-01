@@ -36,14 +36,14 @@
 -- 1. Columns
 -- =========================================================================
 
-alter table public.profiles
+alter table public.badminton_profiles
   add column if not exists owned_pets text[] not null default '{}'::text[];
 
-alter table public.profiles
+alter table public.badminton_profiles
   add column if not exists equipped_pet text;
 
 do $$ begin
-  alter table public.profiles
+  alter table public.badminton_profiles
     add constraint profiles_equipped_pet_chk
     check (equipped_pet is null or equipped_pet in ('doux', 'mort', 'tard', 'vita'));
 exception when duplicate_object then null;
@@ -53,7 +53,7 @@ end $$;
 -- 2. buy_pet — deduct, add to owned, auto-equip
 -- =========================================================================
 
-create or replace function public.buy_pet(p_kind text)
+create or replace function public.badminton_buy_pet(p_kind text)
 returns int
 language plpgsql
 security definer
@@ -77,7 +77,7 @@ begin
   if v_caller is null then
     raise exception 'Must be signed in';
   end if;
-  if v_caller = public.anonymous_user_id() then
+  if v_caller = public.badminton_anonymous_user_id() then
     raise exception 'Anonymous cannot buy';
   end if;
 
@@ -100,12 +100,12 @@ begin
     into v_singles_rating, v_singles_games,
          v_doubles_rating, v_doubles_games,
          v_current_shards, v_owned
-    from public.profiles where id = v_caller for update;
+    from public.badminton_profiles where id = v_caller for update;
 
   -- Best tier across both modes — being Predator in either mode
   -- qualifies you for the top pet.
-  v_singles_tier := public.effective_tier_rank(v_singles_rating, v_singles_games);
-  v_doubles_tier := public.effective_tier_rank(v_doubles_rating, v_doubles_games);
+  v_singles_tier := public.badminton_effective_tier_rank(v_singles_rating, v_singles_games);
+  v_doubles_tier := public.badminton_effective_tier_rank(v_doubles_rating, v_doubles_games);
   v_best_tier := greatest(v_singles_tier, v_doubles_tier);
 
   if v_best_tier < v_required_tier then
@@ -124,7 +124,7 @@ begin
 
   -- Auto-equip the new pet ONLY when nothing is currently equipped
   -- (preserves the player's display choice once they've made one).
-  update public.profiles
+  update public.badminton_profiles
      set shards = shards - v_cost,
          owned_pets = array_append(coalesce(owned_pets, '{}'::text[]), p_kind),
          equipped_pet = coalesce(equipped_pet, p_kind)
@@ -135,14 +135,14 @@ begin
 end;
 $$;
 
-grant execute on function public.buy_pet(text) to authenticated;
+grant execute on function public.badminton_buy_pet(text) to authenticated;
 
 -- =========================================================================
 -- 3. equip_pet — swap which pet is displayed (must already own it).
 --    Pass NULL to unequip.
 -- =========================================================================
 
-create or replace function public.equip_pet(p_kind text)
+create or replace function public.badminton_equip_pet(p_kind text)
 returns void
 language plpgsql
 security definer
@@ -157,7 +157,7 @@ begin
   end if;
 
   if p_kind is null then
-    update public.profiles set equipped_pet = null where id = v_caller;
+    update public.badminton_profiles set equipped_pet = null where id = v_caller;
     return;
   end if;
 
@@ -166,13 +166,13 @@ begin
   end if;
 
   select owned_pets into v_owned
-    from public.profiles where id = v_caller;
+    from public.badminton_profiles where id = v_caller;
   if not (p_kind = any(coalesce(v_owned, '{}'::text[]))) then
     raise exception 'You do not own this pet';
   end if;
 
-  update public.profiles set equipped_pet = p_kind where id = v_caller;
+  update public.badminton_profiles set equipped_pet = p_kind where id = v_caller;
 end;
 $$;
 
-grant execute on function public.equip_pet(text) to authenticated;
+grant execute on function public.badminton_equip_pet(text) to authenticated;

@@ -27,22 +27,22 @@
 -- =========================================================================
 
 do $$ begin
-  create type match_type as enum ('singles', 'doubles');
+  create type badminton_match_type as enum ('singles', 'doubles');
 exception when duplicate_object then null;
 end $$;
 
 do $$ begin
-  create type match_status as enum ('pending', 'confirmed', 'rejected', 'expired');
+  create type badminton_match_status as enum ('pending', 'confirmed', 'rejected', 'expired');
 exception when duplicate_object then null;
 end $$;
 
 do $$ begin
-  create type match_team as enum ('A', 'B');
+  create type badminton_match_team as enum ('A', 'B');
 exception when duplicate_object then null;
 end $$;
 
 do $$ begin
-  create type confirmation_status as enum ('pending', 'accepted', 'rejected');
+  create type badminton_confirmation_status as enum ('pending', 'accepted', 'rejected');
 exception when duplicate_object then null;
 end $$;
 
@@ -50,7 +50,7 @@ end $$;
 -- 2. Profiles (one row per auth.users entry)
 -- =========================================================================
 
-create table if not exists public.profiles (
+create table if not exists public.badminton_profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text not null check (char_length(display_name) between 1 and 15),
   avatar_url text,
@@ -72,7 +72,7 @@ create table if not exists public.profiles (
 );
 
 -- Idempotent column adds for existing prod that pre-dates the column.
-alter table public.profiles
+alter table public.badminton_profiles
   add column if not exists is_admin boolean not null default false,
   add column if not exists peak_singles_rating int not null default 1000,
   add column if not exists peak_doubles_rating int not null default 1000,
@@ -81,22 +81,22 @@ alter table public.profiles
 
 -- Idempotent backfill: peak >= current rating. Re-running is a no-op
 -- because greatest() is monotonic.
-update public.profiles
+update public.badminton_profiles
    set peak_singles_rating = greatest(peak_singles_rating, singles_rating),
        peak_doubles_rating = greatest(peak_doubles_rating, doubles_rating);
 
-create index if not exists profiles_singles_rating_idx on public.profiles (singles_rating desc);
-create index if not exists profiles_doubles_rating_idx on public.profiles (doubles_rating desc);
+create index if not exists badminton_profiles_singles_rating_idx on public.badminton_profiles (singles_rating desc);
+create index if not exists badminton_profiles_doubles_rating_idx on public.badminton_profiles (doubles_rating desc);
 
 -- Auto-create profile row when a new auth user signs up.
-create or replace function public.handle_new_user()
+create or replace function public.badminton_handle_new_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, display_name)
+  insert into public.badminton_profiles (id, display_name)
   values (
     new.id,
     left(
@@ -111,17 +111,17 @@ begin
 end;
 $$;
 
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
+drop trigger if exists badminton_on_auth_user_created on auth.users;
+create trigger badminton_on_auth_user_created
   after insert on auth.users
-  for each row execute function public.handle_new_user();
+  for each row execute function public.badminton_handle_new_user();
 
 -- =========================================================================
 -- 2b. Seasons (latest row's started_at is the current-season cutoff
 --     used by streak/win SQL helpers in 0003)
 -- =========================================================================
 
-create table if not exists public.seasons (
+create table if not exists public.badminton_seasons (
   number int primary key,
   started_at timestamptz not null default now()
 );
@@ -129,28 +129,28 @@ create table if not exists public.seasons (
 -- Seed season 1 with a far-past start so every existing match counts
 -- as belonging to the current season. reset_season() (in 0007) inserts
 -- season 2, 3, … with started_at = now().
-insert into public.seasons (number, started_at)
+insert into public.badminton_seasons (number, started_at)
 select 1, '1970-01-01'::timestamptz
- where not exists (select 1 from public.seasons);
+ where not exists (select 1 from public.badminton_seasons);
 
-alter table public.seasons enable row level security;
+alter table public.badminton_seasons enable row level security;
 
-drop policy if exists "Seasons readable by all" on public.seasons;
+drop policy if exists "Seasons readable by all" on public.badminton_seasons;
 create policy "Seasons readable by all"
-  on public.seasons for select
+  on public.badminton_seasons for select
   to authenticated using (true);
 
 -- =========================================================================
 -- 3. Matches & participants
 -- =========================================================================
 
-create table if not exists public.matches (
+create table if not exists public.badminton_matches (
   id uuid primary key default gen_random_uuid(),
-  match_type match_type not null,
-  created_by uuid not null references public.profiles(id) on delete cascade,
+  match_type badminton_match_type not null,
+  created_by uuid not null references public.badminton_profiles(id) on delete cascade,
   score_a int not null check (score_a >= 0),
   score_b int not null check (score_b >= 0),
-  status match_status not null default 'pending',
+  status badminton_match_status not null default 'pending',
   played_at timestamptz not null default now(),
   confirmed_at timestamptz,
   expires_at timestamptz not null default (now() + interval '7 days'),
@@ -158,15 +158,15 @@ create table if not exists public.matches (
   check (score_a <> score_b)  -- no ties
 );
 
-create index if not exists matches_status_idx on public.matches (status);
-create index if not exists matches_played_at_idx on public.matches (played_at desc);
-create index if not exists matches_expires_at_idx on public.matches (expires_at) where status = 'pending';
+create index if not exists badminton_matches_status_idx on public.badminton_matches (status);
+create index if not exists badminton_matches_played_at_idx on public.badminton_matches (played_at desc);
+create index if not exists badminton_matches_expires_at_idx on public.badminton_matches (expires_at) where status = 'pending';
 
-create table if not exists public.match_participants (
-  match_id uuid not null references public.matches(id) on delete cascade,
-  user_id uuid not null references public.profiles(id) on delete cascade,
-  team match_team not null,
-  confirmation confirmation_status not null default 'pending',
+create table if not exists public.badminton_match_participants (
+  match_id uuid not null references public.badminton_matches(id) on delete cascade,
+  user_id uuid not null references public.badminton_profiles(id) on delete cascade,
+  team badminton_match_team not null,
+  confirmation badminton_confirmation_status not null default 'pending',
   responded_at timestamptz,
   rating_before int,
   rating_after int,
@@ -174,8 +174,8 @@ create table if not exists public.match_participants (
   primary key (match_id, user_id)
 );
 
-create index if not exists match_participants_user_pending_idx
-  on public.match_participants (user_id)
+create index if not exists badminton_match_participants_user_pending_idx
+  on public.badminton_match_participants (user_id)
   where confirmation = 'pending';
 
 -- =========================================================================
@@ -183,7 +183,7 @@ create index if not exists match_participants_user_pending_idx
 -- =========================================================================
 
 -- Enforce correct team sizes and prevent same player on both teams.
-create or replace function public.validate_match_participants()
+create or replace function public.badminton_validate_match_participants()
 returns trigger
 language plpgsql
 as $$
@@ -193,7 +193,7 @@ declare
   count_b int;
   expected_size int;
 begin
-  select * into m from public.matches where id = new.match_id;
+  select * into m from public.badminton_matches where id = new.match_id;
   if not found then
     return new;
   end if;
@@ -204,7 +204,7 @@ begin
     count(*) filter (where team = 'A'),
     count(*) filter (where team = 'B')
     into count_a, count_b
-  from public.match_participants
+  from public.badminton_match_participants
   where match_id = new.match_id;
 
   if count_a > expected_size or count_b > expected_size then
@@ -215,17 +215,17 @@ begin
 end;
 $$;
 
-drop trigger if exists trg_validate_match_participants on public.match_participants;
+drop trigger if exists trg_validate_match_participants on public.badminton_match_participants;
 create trigger trg_validate_match_participants
-  after insert on public.match_participants
-  for each row execute function public.validate_match_participants();
+  after insert on public.badminton_match_participants
+  for each row execute function public.badminton_validate_match_participants();
 
 -- =========================================================================
 -- 5. ELO settlement on full confirmation
 -- =========================================================================
 
 -- Constants here MUST match src/lib/elo.ts and docs/ELO_CALCULATION.md.
-create or replace function public.settle_match(p_match_id uuid)
+create or replace function public.badminton_settle_match(p_match_id uuid)
 returns void
 language plpgsql
 security definer
@@ -259,9 +259,9 @@ declare
   delta int;
   score_diff int;
   margin_mult numeric;
-  winning_team match_team;
+  winning_team badminton_match_team;
 begin
-  select * into m from public.matches where id = p_match_id for update;
+  select * into m from public.badminton_matches where id = p_match_id for update;
   if not found or m.status <> 'pending' then
     return;
   end if;
@@ -269,12 +269,12 @@ begin
   -- One acceptance per team is enough. Bail if either side has none.
   -- Singles falls out naturally: 1 per team = both players.
   if not exists (
-    select 1 from public.match_participants
+    select 1 from public.badminton_match_participants
      where match_id = p_match_id
        and team = 'A'
        and confirmation = 'accepted'
   ) or not exists (
-    select 1 from public.match_participants
+    select 1 from public.badminton_match_participants
      where match_id = p_match_id
        and team = 'B'
        and confirmation = 'accepted'
@@ -295,17 +295,17 @@ begin
   -- Compute team mean ratings.
   execute format(
     'select avg(p.%I)::numeric
-       from public.match_participants mp
-       join public.profiles p on p.id = mp.user_id
-      where mp.match_id = $1 and mp.team = $2::match_team',
+       from public.badminton_match_participants mp
+       join public.badminton_profiles p on p.id = mp.user_id
+      where mp.match_id = $1 and mp.team = $2::badminton_match_team',
     rating_col
   ) using p_match_id, 'A' into rating_a;
 
   execute format(
     'select avg(p.%I)::numeric
-       from public.match_participants mp
-       join public.profiles p on p.id = mp.user_id
-      where mp.match_id = $1 and mp.team = $2::match_team',
+       from public.badminton_match_participants mp
+       join public.badminton_profiles p on p.id = mp.user_id
+      where mp.match_id = $1 and mp.team = $2::badminton_match_team',
     rating_col
   ) using p_match_id, 'B' into rating_b;
 
@@ -326,9 +326,9 @@ begin
 
   -- Loop participants, compute per-player delta with their personal K.
   for participant in
-    select user_id, team from public.match_participants where match_id = p_match_id
+    select user_id, team from public.badminton_match_participants where match_id = p_match_id
   loop
-    execute format('select %I, %I from public.profiles where id = $1', rating_col, games_col)
+    execute format('select %I, %I from public.badminton_profiles where id = $1', rating_col, games_col)
       using participant.user_id into current_rating, current_games;
 
     base_k := case when current_games < provisional_games then k_provisional else k_established end;
@@ -347,7 +347,7 @@ begin
 
     delta := round(effective_k * (team_actual - team_expected));
 
-    update public.match_participants
+    update public.badminton_match_participants
        set rating_before = current_rating,
            rating_after = current_rating + delta,
            rating_delta = delta
@@ -358,7 +358,7 @@ begin
     -- greatest(peak_col, rating_col + $1) compares old peak to the
     -- post-update rating.
     execute format(
-      'update public.profiles
+      'update public.badminton_profiles
           set %I = %I + $1,
               %I = %I + 1,
               %I = greatest(%I, %I + $1)
@@ -369,7 +369,7 @@ begin
     ) using delta, participant.user_id;
   end loop;
 
-  update public.matches
+  update public.badminton_matches
      set status = 'confirmed', confirmed_at = now(), elo_version = 2
    where id = p_match_id;
 end;
@@ -377,44 +377,44 @@ $$;
 
 -- Trigger: when the last participant accepts, settle the match.
 -- When any participant rejects, mark the match rejected.
-create or replace function public.handle_confirmation_change()
+create or replace function public.badminton_handle_confirmation_change()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
 declare
-  m_status match_status;
+  m_status badminton_match_status;
 begin
   if new.confirmation = old.confirmation then
     return new;
   end if;
 
-  select status into m_status from public.matches where id = new.match_id;
+  select status into m_status from public.badminton_matches where id = new.match_id;
   if m_status <> 'pending' then
     return new;
   end if;
 
   if new.confirmation = 'rejected' then
     -- Any single rejection kills the match — one veto is enough.
-    update public.matches set status = 'rejected' where id = new.match_id;
+    update public.badminton_matches set status = 'rejected' where id = new.match_id;
     return new;
   end if;
 
   if new.confirmation = 'accepted' then
     -- Settle as soon as each team has at least one acceptance.
     if exists (
-      select 1 from public.match_participants
+      select 1 from public.badminton_match_participants
        where match_id = new.match_id
          and team = 'A'
          and confirmation = 'accepted'
     ) and exists (
-      select 1 from public.match_participants
+      select 1 from public.badminton_match_participants
        where match_id = new.match_id
          and team = 'B'
          and confirmation = 'accepted'
     ) then
-      perform public.settle_match(new.match_id);
+      perform public.badminton_settle_match(new.match_id);
     end if;
   end if;
 
@@ -422,23 +422,23 @@ begin
 end;
 $$;
 
-drop trigger if exists trg_handle_confirmation_change on public.match_participants;
+drop trigger if exists trg_handle_confirmation_change on public.badminton_match_participants;
 create trigger trg_handle_confirmation_change
-  after update of confirmation on public.match_participants
-  for each row execute function public.handle_confirmation_change();
+  after update of confirmation on public.badminton_match_participants
+  for each row execute function public.badminton_handle_confirmation_change();
 
 -- =========================================================================
 -- 6. Row Level Security
 -- =========================================================================
 
-alter table public.profiles enable row level security;
-alter table public.matches enable row level security;
-alter table public.match_participants enable row level security;
+alter table public.badminton_profiles enable row level security;
+alter table public.badminton_matches enable row level security;
+alter table public.badminton_match_participants enable row level security;
 
 -- Helper: SECURITY DEFINER membership check that bypasses RLS, so the
 -- match_participants SELECT policy can reference its own table without
 -- triggering 42P17 "infinite recursion in policy".
-create or replace function public.is_match_participant(
+create or replace function public.badminton_is_match_participant(
   p_match_id uuid,
   p_user_id uuid
 )
@@ -449,23 +449,23 @@ security definer
 set search_path = public
 as $$
   select exists (
-    select 1 from public.match_participants
+    select 1 from public.badminton_match_participants
     where match_id = p_match_id and user_id = p_user_id
   );
 $$;
 
-grant execute on function public.is_match_participant(uuid, uuid) to authenticated;
+grant execute on function public.badminton_is_match_participant(uuid, uuid) to authenticated;
 
 -- Profiles: anyone signed in can read; only the owner can update their profile.
-drop policy if exists "Profiles readable by all signed-in users" on public.profiles;
+drop policy if exists "Profiles readable by all signed-in users" on public.badminton_profiles;
 create policy "Profiles readable by all signed-in users"
-  on public.profiles for select
+  on public.badminton_profiles for select
   to authenticated
   using (true);
 
-drop policy if exists "Users can update own profile" on public.profiles;
+drop policy if exists "Users can update own profile" on public.badminton_profiles;
 create policy "Users can update own profile"
-  on public.profiles for update
+  on public.badminton_profiles for update
   to authenticated
   using (auth.uid() = id)
   with check (auth.uid() = id);
@@ -478,18 +478,18 @@ create policy "Users can update own profile"
 -- Read: any participant or the creator.
 -- Insert: must be the creator and a participant.
 -- Update: only the creator can cancel a still-pending match (handled later).
-drop policy if exists "Matches visible to participants" on public.matches;
+drop policy if exists "Matches visible to participants" on public.badminton_matches;
 create policy "Matches visible to participants"
-  on public.matches for select
+  on public.badminton_matches for select
   to authenticated
   using (
     auth.uid() = created_by
-    or public.is_match_participant(id, auth.uid())
+    or public.badminton_is_match_participant(id, auth.uid())
   );
 
-drop policy if exists "Users can create matches as themselves" on public.matches;
+drop policy if exists "Users can create matches as themselves" on public.badminton_matches;
 create policy "Users can create matches as themselves"
-  on public.matches for insert
+  on public.badminton_matches for insert
   to authenticated
   with check (created_by = auth.uid());
 
@@ -497,33 +497,33 @@ create policy "Users can create matches as themselves"
 -- Read: any signed-in user can read participants of matches they are in or created.
 -- Insert: creator of the match adds participants at match-creation time.
 -- Update: a user can only update their own confirmation.
-drop policy if exists "Participants visible to involved users" on public.match_participants;
+drop policy if exists "Participants visible to involved users" on public.badminton_match_participants;
 create policy "Participants visible to involved users"
-  on public.match_participants for select
+  on public.badminton_match_participants for select
   to authenticated
   using (
     user_id = auth.uid()
-    or public.is_match_participant(match_id, auth.uid())
+    or public.badminton_is_match_participant(match_id, auth.uid())
     or exists (
-      select 1 from public.matches m
-      where m.id = match_participants.match_id and m.created_by = auth.uid()
+      select 1 from public.badminton_matches m
+      where m.id = badminton_match_participants.match_id and m.created_by = auth.uid()
     )
   );
 
-drop policy if exists "Match creator inserts participants" on public.match_participants;
+drop policy if exists "Match creator inserts participants" on public.badminton_match_participants;
 create policy "Match creator inserts participants"
-  on public.match_participants for insert
+  on public.badminton_match_participants for insert
   to authenticated
   with check (
     exists (
-      select 1 from public.matches m
+      select 1 from public.badminton_matches m
       where m.id = match_id and m.created_by = auth.uid()
     )
   );
 
-drop policy if exists "Users update only own confirmation" on public.match_participants;
+drop policy if exists "Users update only own confirmation" on public.badminton_match_participants;
 create policy "Users update only own confirmation"
-  on public.match_participants for update
+  on public.badminton_match_participants for update
   to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
@@ -534,12 +534,12 @@ create policy "Users update only own confirmation"
 
 -- Allow Realtime to broadcast inserts/updates on these tables (idempotent).
 do $$ begin
-  alter publication supabase_realtime add table public.matches;
+  alter publication supabase_realtime add table public.badminton_matches;
 exception when duplicate_object then null;
 end $$;
 
 do $$ begin
-  alter publication supabase_realtime add table public.match_participants;
+  alter publication supabase_realtime add table public.badminton_match_participants;
 exception when duplicate_object then null;
 end $$;
 
@@ -547,7 +547,7 @@ end $$;
 -- 8. Match expiry job (call from a scheduled edge function or pg_cron)
 -- =========================================================================
 
-create or replace function public.expire_old_matches()
+create or replace function public.badminton_expire_old_matches()
 returns int
 language plpgsql
 security definer
@@ -556,7 +556,7 @@ as $$
 declare
   affected int;
 begin
-  update public.matches
+  update public.badminton_matches
      set status = 'expired'
    where status = 'pending' and expires_at < now();
   get diagnostics affected = row_count;

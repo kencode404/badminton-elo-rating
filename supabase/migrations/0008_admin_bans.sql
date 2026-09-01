@@ -18,21 +18,21 @@
 -- 1. Ban columns + index
 -- =========================================================================
 
-alter table public.profiles
+alter table public.badminton_profiles
   add column if not exists is_banned boolean not null default false,
   add column if not exists banned_at timestamptz,
-  add column if not exists banned_by uuid references public.profiles(id) on delete set null,
+  add column if not exists banned_by uuid references public.badminton_profiles(id) on delete set null,
   add column if not exists banned_reason text;
 
 -- Partial index — most rows are not banned, so this stays tiny.
-create index if not exists profiles_banned_idx
-  on public.profiles (banned_at desc) where is_banned = true;
+create index if not exists badminton_profiles_banned_idx
+  on public.badminton_profiles (banned_at desc) where is_banned = true;
 
 -- =========================================================================
 -- 2. ban_user / unban_user RPCs
 -- =========================================================================
 
-create or replace function public.ban_user(
+create or replace function public.badminton_ban_user(
   p_target_id uuid,
   p_reason text default null
 ) returns void
@@ -47,7 +47,7 @@ declare
   v_admin_name text;
 begin
   select is_admin into v_admin
-    from public.profiles
+    from public.badminton_profiles
    where id = auth.uid();
   if not coalesce(v_admin, false) then
     raise exception 'Only admins can ban users';
@@ -57,13 +57,13 @@ begin
   end if;
 
   select is_admin into v_target_admin
-    from public.profiles
+    from public.badminton_profiles
    where id = p_target_id;
   if coalesce(v_target_admin, false) then
     raise exception 'You cannot ban another admin';
   end if;
 
-  update public.profiles
+  update public.badminton_profiles
      set is_banned = true,
          banned_at = now(),
          banned_by = auth.uid(),
@@ -72,11 +72,11 @@ begin
    returning display_name into v_target_name;
 
   select display_name into v_admin_name
-    from public.profiles where id = auth.uid();
+    from public.badminton_profiles where id = auth.uid();
 
   -- Quiet centered grey log line in chat — broadcasts the ban to the
   -- club without breaking the streak/tier celebration cadence.
-  insert into public.chat_messages
+  insert into public.badminton_chat_messages
     (kind, user_id, body, expires_at)
   values (
     'system_user_banned',
@@ -88,9 +88,9 @@ begin
 end;
 $$;
 
-grant execute on function public.ban_user(uuid, text) to authenticated;
+grant execute on function public.badminton_ban_user(uuid, text) to authenticated;
 
-create or replace function public.unban_user(p_target_id uuid)
+create or replace function public.badminton_unban_user(p_target_id uuid)
 returns void
 language plpgsql
 security definer
@@ -100,12 +100,12 @@ declare
   v_admin boolean;
 begin
   select is_admin into v_admin
-    from public.profiles
+    from public.badminton_profiles
    where id = auth.uid();
   if not coalesce(v_admin, false) then
     raise exception 'Only admins can unban users';
   end if;
-  update public.profiles
+  update public.badminton_profiles
      set is_banned = false,
          banned_at = null,
          banned_by = null,
@@ -114,4 +114,4 @@ begin
 end;
 $$;
 
-grant execute on function public.unban_user(uuid) to authenticated;
+grant execute on function public.badminton_unban_user(uuid) to authenticated;

@@ -6,7 +6,7 @@ import { ANONYMOUS_ID } from '../lib/anonymous';
 import { useCreateMatch } from '../lib/queries';
 import type { Database, MatchType } from '../lib/database.types';
 
-type ProfileLite = Pick<Database['public']['Tables']['profiles']['Row'], 'id' | 'display_name' | 'avatar_url'>;
+type ProfileLite = Pick<Database['public']['Tables']['badminton_profiles']['Row'], 'id' | 'display_name' | 'avatar_url'>;
 
 export function NewMatchPage() {
   const { user } = useAuth();

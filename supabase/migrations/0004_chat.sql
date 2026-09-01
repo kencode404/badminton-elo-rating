@@ -18,10 +18,10 @@
 -- Safe to rerun.
 
 -- =========================================================================
--- 1. profiles.chat_last_seen_at
+-- 1. badminton_profiles.chat_last_seen_at
 -- =========================================================================
 
-alter table public.profiles
+alter table public.badminton_profiles
   add column if not exists chat_last_seen_at timestamptz not null
     default '1970-01-01 00:00:00+00';
 
@@ -32,7 +32,7 @@ alter table public.profiles
 -- =========================================================================
 
 do $$ begin
-  create type chat_message_kind as enum (
+  create type badminton_chat_message_kind as enum (
     'system_streak',
     'system_tier_up',
     'system_streak_ended',
@@ -47,45 +47,45 @@ end $$;
 -- 3. chat_messages
 -- =========================================================================
 
-create table if not exists public.chat_messages (
+create table if not exists public.badminton_chat_messages (
   id uuid primary key default gen_random_uuid(),
-  kind chat_message_kind not null,
-  user_id uuid references public.profiles(id) on delete cascade,
+  kind badminton_chat_message_kind not null,
+  user_id uuid references public.badminton_profiles(id) on delete cascade,
   body text,
-  match_type match_type,
+  match_type badminton_match_type,
   streak_count int,
   tier_key text,
   breaker_user_ids uuid[],
-  reply_to_message_id uuid references public.chat_messages(id) on delete set null,
+  reply_to_message_id uuid references public.badminton_chat_messages(id) on delete set null,
   mentioned_user_ids uuid[],
   created_at timestamptz not null default now(),
   expires_at timestamptz
 );
 
 -- Idempotent column adds for existing prod that pre-dates them.
-alter table public.chat_messages
+alter table public.badminton_chat_messages
   add column if not exists tier_key text,
   add column if not exists breaker_user_ids uuid[],
   add column if not exists reply_to_message_id uuid
-    references public.chat_messages(id) on delete set null,
+    references public.badminton_chat_messages(id) on delete set null,
   add column if not exists mentioned_user_ids uuid[];
 
-create index if not exists chat_messages_created_idx
-  on public.chat_messages (created_at desc);
+create index if not exists badminton_chat_messages_created_idx
+  on public.badminton_chat_messages (created_at desc);
 
-create index if not exists chat_messages_reply_to_idx
-  on public.chat_messages (reply_to_message_id)
+create index if not exists badminton_chat_messages_reply_to_idx
+  on public.badminton_chat_messages (reply_to_message_id)
   where reply_to_message_id is not null;
 
 -- GIN index — used by the bell-badge query to find messages where
 -- the current user is in mentioned_user_ids.
-create index if not exists chat_messages_mentions_idx
-  on public.chat_messages using gin (mentioned_user_ids);
+create index if not exists badminton_chat_messages_mentions_idx
+  on public.badminton_chat_messages using gin (mentioned_user_ids);
 
-alter table public.chat_messages
+alter table public.badminton_chat_messages
   drop constraint if exists chat_messages_check;
 
-alter table public.chat_messages
+alter table public.badminton_chat_messages
   add constraint chat_messages_check check (
     (kind = 'system_streak'
       and user_id is not null
@@ -117,26 +117,26 @@ alter table public.chat_messages
       and length(trim(body)) > 0)
   );
 
-alter table public.chat_messages enable row level security;
+alter table public.badminton_chat_messages enable row level security;
 
-drop policy if exists "Chat messages readable by all" on public.chat_messages;
+drop policy if exists "Chat messages readable by all" on public.badminton_chat_messages;
 create policy "Chat messages readable by all"
-  on public.chat_messages for select
+  on public.badminton_chat_messages for select
   to authenticated
   using (true);
 
-drop policy if exists "Users can post user chat messages" on public.chat_messages;
+drop policy if exists "Users can post user chat messages" on public.badminton_chat_messages;
 create policy "Users can post user chat messages"
-  on public.chat_messages for insert
+  on public.badminton_chat_messages for insert
   to authenticated
   with check (kind = 'user' and user_id = auth.uid());
 
 -- Unsend window: users can delete their own user messages for 10
 -- minutes after sending. Enforced server-side; the client hides the
 -- unsend button once the window closes.
-drop policy if exists "Users can delete own chat messages" on public.chat_messages;
+drop policy if exists "Users can delete own chat messages" on public.badminton_chat_messages;
 create policy "Users can delete own chat messages"
-  on public.chat_messages for delete
+  on public.badminton_chat_messages for delete
   to authenticated
   using (
     kind = 'user'
@@ -149,7 +149,7 @@ create policy "Users can delete own chat messages"
 -- =========================================================================
 
 -- Tier thresholds — keep in sync with src/lib/tiers.ts.
-create or replace function public.rating_to_tier_key(p_rating int)
+create or replace function public.badminton_rating_to_tier_key(p_rating int)
 returns text
 language sql
 immutable
@@ -163,7 +163,7 @@ as $$
   end;
 $$;
 
-create or replace function public.tier_rank(p_key text)
+create or replace function public.badminton_tier_rank(p_key text)
 returns int
 language sql
 immutable
@@ -181,9 +181,9 @@ $$;
 -- Counts consecutive wins for p_user_id in p_mode immediately before
 -- p_match_id (excluding p_match_id itself), restricted to the current
 -- season window. Used to detect "your X-win streak just ended" cases.
-create or replace function public.streak_before_match(
+create or replace function public.badminton_streak_before_match(
   p_user_id uuid,
-  p_mode match_type,
+  p_mode badminton_match_type,
   p_match_id uuid
 ) returns int
 language plpgsql
@@ -196,14 +196,14 @@ declare
   rec record;
 begin
   select played_at into ref_played_at
-    from public.matches
+    from public.badminton_matches
    where id = p_match_id;
   if ref_played_at is null then
     return 0;
   end if;
 
   select started_at into v_season_start
-    from public.seasons
+    from public.badminton_seasons
    order by number desc
    limit 1;
 
@@ -212,8 +212,8 @@ begin
       case when (mp.team = 'A' and m.score_a > m.score_b)
             or (mp.team = 'B' and m.score_b > m.score_a)
            then 1 else 0 end as won
-    from public.matches m
-    join public.match_participants mp on mp.match_id = m.id
+    from public.badminton_matches m
+    join public.badminton_match_participants mp on mp.match_id = m.id
     where mp.user_id = p_user_id
       and m.match_type = p_mode
       and m.status = 'confirmed'
@@ -244,7 +244,7 @@ $$;
 -- Streak announcements are placement-agnostic.
 -- =========================================================================
 
-create or replace function public.refresh_chat_streak_messages()
+create or replace function public.badminton_refresh_chat_streak_messages()
 returns trigger
 language plpgsql
 security definer
@@ -263,7 +263,7 @@ declare
 begin
   select array_agg(mp.user_id)
     into v_winner_ids
-  from public.match_participants mp
+  from public.badminton_match_participants mp
   where mp.match_id = new.id
     and (
       (mp.team = 'A' and new.score_a > new.score_b)
@@ -272,7 +272,7 @@ begin
 
   for participant in
     select user_id, team, rating_before, rating_after
-      from public.match_participants
+      from public.badminton_match_participants
      where match_id = new.id
   loop
     participant_won :=
@@ -283,29 +283,29 @@ begin
     -- incremented it).
     if new.match_type = 'singles' then
       select singles_games_played into v_games
-        from public.profiles where id = participant.user_id;
+        from public.badminton_profiles where id = participant.user_id;
     else
       select doubles_games_played into v_games
-        from public.profiles where id = participant.user_id;
+        from public.badminton_profiles where id = participant.user_id;
     end if;
 
     -- Placement-complete reveal — fires for every participant whose
     -- 5th game just settled, regardless of win/loss.
     if v_games = v_placement_games and participant.rating_after is not null then
-      insert into public.chat_messages
+      insert into public.badminton_chat_messages
         (kind, user_id, match_type, tier_key, expires_at)
       values
         ('system_tier_up', participant.user_id, new.match_type,
-         public.rating_to_tier_key(participant.rating_after),
+         public.badminton_rating_to_tier_key(participant.rating_after),
          now() + interval '30 days');
     end if;
 
     if participant_won then
       -- (a) Existing on-going streak announcement (placement-agnostic).
-      v_streak := public.current_streak_for_user_mode(
+      v_streak := public.badminton_current_streak_for_user_mode(
         participant.user_id, new.match_type);
       if v_streak >= 2 then
-        insert into public.chat_messages
+        insert into public.badminton_chat_messages
           (kind, user_id, match_type, streak_count, expires_at)
         values
           ('system_streak', participant.user_id, new.match_type, v_streak,
@@ -318,11 +318,11 @@ begin
       if v_games > v_placement_games
          and participant.rating_before is not null
          and participant.rating_after is not null then
-        v_old_tier := public.rating_to_tier_key(participant.rating_before);
-        v_new_tier := public.rating_to_tier_key(participant.rating_after);
+        v_old_tier := public.badminton_rating_to_tier_key(participant.rating_before);
+        v_new_tier := public.badminton_rating_to_tier_key(participant.rating_after);
         if v_new_tier <> v_old_tier
-           and public.tier_rank(v_new_tier) > public.tier_rank(v_old_tier) then
-          insert into public.chat_messages
+           and public.badminton_tier_rank(v_new_tier) > public.badminton_tier_rank(v_old_tier) then
+          insert into public.badminton_chat_messages
             (kind, user_id, match_type, tier_key, expires_at)
           values
             ('system_tier_up', participant.user_id, new.match_type,
@@ -333,10 +333,10 @@ begin
     else
       -- (c) Streak-ended (placement-agnostic).
       if v_winner_ids is not null and array_length(v_winner_ids, 1) >= 1 then
-        v_loser_streak := public.streak_before_match(
+        v_loser_streak := public.badminton_streak_before_match(
           participant.user_id, new.match_type, new.id);
         if v_loser_streak >= 2 then
-          insert into public.chat_messages
+          insert into public.badminton_chat_messages
             (kind, user_id, match_type, streak_count, breaker_user_ids, expires_at)
           values
             ('system_streak_ended', participant.user_id, new.match_type,
@@ -349,7 +349,7 @@ begin
 
   -- Stale match-derived announcements go; ban / reset moderation logs
   -- are kept (they have their own 30-day timer).
-  delete from public.chat_messages
+  delete from public.badminton_chat_messages
    where kind in ('system_streak', 'system_tier_up', 'system_streak_ended')
      and expires_at is not null
      and expires_at < now();
@@ -358,52 +358,52 @@ begin
 end;
 $$;
 
-drop trigger if exists trg_refresh_chat_streak_messages on public.matches;
+drop trigger if exists trg_refresh_chat_streak_messages on public.badminton_matches;
 create trigger trg_refresh_chat_streak_messages
-  after update of status on public.matches
+  after update of status on public.badminton_matches
   for each row
   when (new.status = 'confirmed' and old.status is distinct from new.status)
-  execute function public.refresh_chat_streak_messages();
+  execute function public.badminton_refresh_chat_streak_messages();
 
 -- =========================================================================
 -- 6. chat_reactions (one per user per message)
 -- =========================================================================
 
-create table if not exists public.chat_reactions (
-  message_id uuid not null references public.chat_messages(id) on delete cascade,
-  user_id uuid not null references public.profiles(id) on delete cascade,
+create table if not exists public.badminton_chat_reactions (
+  message_id uuid not null references public.badminton_chat_messages(id) on delete cascade,
+  user_id uuid not null references public.badminton_profiles(id) on delete cascade,
   emoji text not null check (length(emoji) between 1 and 16),
   created_at timestamptz not null default now(),
   primary key (message_id, user_id)
 );
 
-create index if not exists chat_reactions_message_idx
-  on public.chat_reactions (message_id);
+create index if not exists badminton_chat_reactions_message_idx
+  on public.badminton_chat_reactions (message_id);
 
-alter table public.chat_reactions enable row level security;
+alter table public.badminton_chat_reactions enable row level security;
 
-drop policy if exists "Reactions readable by all" on public.chat_reactions;
+drop policy if exists "Reactions readable by all" on public.badminton_chat_reactions;
 create policy "Reactions readable by all"
-  on public.chat_reactions for select
+  on public.badminton_chat_reactions for select
   to authenticated
   using (true);
 
-drop policy if exists "Users react as themselves" on public.chat_reactions;
+drop policy if exists "Users react as themselves" on public.badminton_chat_reactions;
 create policy "Users react as themselves"
-  on public.chat_reactions for insert
+  on public.badminton_chat_reactions for insert
   to authenticated
   with check (user_id = auth.uid());
 
-drop policy if exists "Users update own reactions" on public.chat_reactions;
+drop policy if exists "Users update own reactions" on public.badminton_chat_reactions;
 create policy "Users update own reactions"
-  on public.chat_reactions for update
+  on public.badminton_chat_reactions for update
   to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 
-drop policy if exists "Users delete own reactions" on public.chat_reactions;
+drop policy if exists "Users delete own reactions" on public.badminton_chat_reactions;
 create policy "Users delete own reactions"
-  on public.chat_reactions for delete
+  on public.badminton_chat_reactions for delete
   to authenticated
   using (user_id = auth.uid());
 
@@ -412,18 +412,18 @@ create policy "Users delete own reactions"
 --               with existing matches doesn't have an empty chat
 -- =========================================================================
 
-insert into public.chat_messages
+insert into public.badminton_chat_messages
   (kind, user_id, match_type, streak_count, expires_at)
-select 'system_streak', s.user_id, 'singles'::match_type, s.singles_streak,
+select 'system_streak', s.user_id, 'singles'::badminton_match_type, s.singles_streak,
        now() + interval '30 days'
-from public.get_win_streaks() s
+from public.badminton_get_win_streaks() s
 where s.singles_streak >= 2
 on conflict do nothing;
 
-insert into public.chat_messages
+insert into public.badminton_chat_messages
   (kind, user_id, match_type, streak_count, expires_at)
-select 'system_streak', s.user_id, 'doubles'::match_type, s.doubles_streak,
+select 'system_streak', s.user_id, 'doubles'::badminton_match_type, s.doubles_streak,
        now() + interval '30 days'
-from public.get_win_streaks() s
+from public.badminton_get_win_streaks() s
 where s.doubles_streak >= 2
 on conflict do nothing;

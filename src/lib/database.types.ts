@@ -21,7 +21,7 @@ export type ChatMessageKind =
 export interface Database {
   public: {
     Tables: {
-      profiles: {
+      badminton_profiles: {
         Row: {
           id: string;
           display_name: string;
@@ -96,7 +96,7 @@ export interface Database {
         };
         Relationships: [];
       };
-      season_snapshots: {
+      badminton_season_snapshots: {
         Row: {
           user_id: string;
           season_number: number;
@@ -126,7 +126,7 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
-      matches: {
+      badminton_matches: {
         Row: {
           id: string;
           match_type: MatchType;
@@ -160,7 +160,7 @@ export interface Database {
         };
         Relationships: [];
       };
-      chat_messages: {
+      badminton_chat_messages: {
         Row: {
           id: string;
           kind: ChatMessageKind;
@@ -195,7 +195,7 @@ export interface Database {
         };
         Relationships: [];
       };
-      chat_reactions: {
+      badminton_chat_reactions: {
         Row: {
           message_id: string;
           user_id: string;
@@ -211,7 +211,7 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
-      match_participants: {
+      badminton_match_participants: {
         Row: {
           match_id: string;
           user_id: string;
@@ -245,11 +245,15 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
-      get_user_win_counts: {
+      badminton_ensure_profile: {
+        Args: Record<string, never>;
+        Returns: undefined;
+      };
+      badminton_get_user_win_counts: {
         Args: { p_user_id: string };
         Returns: { singles_wins: number; doubles_wins: number }[];
       };
-      get_recent_matches: {
+      badminton_get_recent_matches: {
         Args: { p_user_id: string; p_limit?: number };
         Returns: {
           match_id: string;
@@ -262,19 +266,19 @@ export interface Database {
           others: Array<{ user_id: string; display_name: string; team: Team }>;
         }[];
       };
-      reset_season: {
+      badminton_reset_season: {
         Args: Record<PropertyKey, never>;
         Returns: number;
       };
-      ban_user: {
+      badminton_ban_user: {
         Args: { p_target_id: string; p_reason?: string | null };
         Returns: void;
       };
-      unban_user: {
+      badminton_unban_user: {
         Args: { p_target_id: string };
         Returns: void;
       };
-      update_pending_match: {
+      badminton_update_pending_match: {
         Args: {
           p_match_id: string;
           p_partner_id: string | null;
@@ -284,7 +288,7 @@ export interface Database {
         };
         Returns: void;
       };
-      get_win_streaks: {
+      badminton_get_win_streaks: {
         Args: Record<PropertyKey, never>;
         Returns: {
           user_id: string;
@@ -292,45 +296,45 @@ export interface Database {
           doubles_streak: number;
         }[];
       };
-      is_match_participant: {
+      badminton_is_match_participant: {
         Args: { p_match_id: string; p_user_id: string };
         Returns: boolean;
       };
-      approve_anonymous_match: {
+      badminton_approve_anonymous_match: {
         Args: { p_match_id: string };
         Returns: void;
       };
-      reject_anonymous_match: {
+      badminton_reject_anonymous_match: {
         Args: { p_match_id: string };
         Returns: void;
       };
-      buy_shield: {
+      badminton_buy_shield: {
         Args: { p_kind: 'iron' | 'aura' };
         Returns: number;
       };
-      buy_booster: {
+      badminton_buy_booster: {
         Args: { p_kind: 'shuttle' };
         Returns: number;
       };
-      buy_pet: {
+      badminton_buy_pet: {
         Args: { p_kind: 'doux' | 'mort' | 'tard' | 'vita' };
         Returns: number;
       };
-      equip_pet: {
+      badminton_equip_pet: {
         Args: { p_kind: 'doux' | 'mort' | 'tard' | 'vita' | null };
         Returns: void;
       };
-      claim_pet_daily: {
+      badminton_claim_pet_daily: {
         Args: Record<PropertyKey, never>;
         Returns: number;
       };
     };
     Enums: {
-      match_type: MatchType;
-      match_status: MatchStatus;
-      match_team: Team;
-      confirmation_status: Confirmation;
-      chat_message_kind: ChatMessageKind;
+      badminton_match_type: MatchType;
+      badminton_match_status: MatchStatus;
+      badminton_match_team: Team;
+      badminton_confirmation_status: Confirmation;
+      badminton_chat_message_kind: ChatMessageKind;
     };
     CompositeTypes: Record<string, never>;
   };

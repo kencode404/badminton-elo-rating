@@ -51,6 +51,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Shared Supabase project: auth.users is shared with another app, so
+  // the sign-up trigger only creates a badminton profile for sign-ups
+  // tagged app=badminton. Google OAuth sign-ins and accounts that were
+  // first created through the other app get their profile lazily here.
+  const userId = session?.user?.id ?? null;
+  useEffect(() => {
+    if (!userId) return;
+    supabase.rpc('badminton_ensure_profile').then(({ error }) => {
+      if (error) console.warn('badminton_ensure_profile failed:', error.message);
+    });
+  }, [userId]);
+
   const signInWithPassword = useCallback(async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
@@ -61,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userId = data.user?.id;
     if (userId) {
       const { data: profile } = await supabase
-        .from('profiles')
+        .from('badminton_profiles')
         .select('is_banned')
         .eq('id', userId)
         .maybeSingle();
@@ -78,7 +90,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { display_name: displayName } },
+        // `app` tags this sign-up for the shared auth.users trigger
+        // (badminton_handle_new_user only creates a profile for app=badminton).
+        options: { data: { display_name: displayName, app: 'badminton' } },
       });
       if (error) return { error: error.message, needsEmailConfirm: false };
       // When email confirmation is enabled (default), session is null until verified.
@@ -136,7 +150,7 @@ export function useBanWatcher() {
     // Catch-up: handle the rare case where the user was banned in the
     // brief gap between session restore and now.
     supabase
-      .from('profiles')
+      .from('badminton_profiles')
       .select('is_banned')
       .eq('id', user.id)
       .maybeSingle()
@@ -151,7 +165,7 @@ export function useBanWatcher() {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'profiles',
+          table: 'badminton_profiles',
           filter: `id=eq.${user.id}`,
         },
         (payload) => {

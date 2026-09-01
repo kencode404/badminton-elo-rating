@@ -7,7 +7,7 @@ import { PastSeasonRow, type PastSeasonSnapshot } from './PastSeasonRow';
 import { PeakTiers } from './PeakTiers';
 import type { Database, MatchType, Team } from '../lib/database.types';
 
-type Profile = Database['public']['Tables']['profiles']['Row'];
+type Profile = Database['public']['Tables']['badminton_profiles']['Row'];
 
 interface RecentOther {
   user_id: string;
@@ -43,7 +43,7 @@ export function ProfileDetailModal({ userId, onClose }: Props) {
     let active = true;
 
     supabase
-      .from('profiles')
+      .from('badminton_profiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle()
@@ -54,7 +54,7 @@ export function ProfileDetailModal({ userId, onClose }: Props) {
       });
 
     supabase
-      .rpc('get_user_win_counts', { p_user_id: userId })
+      .rpc('badminton_get_user_win_counts', { p_user_id: userId })
       .then(({ data, error }) => {
         if (!active) return;
         if (error) {
@@ -71,7 +71,7 @@ export function ProfileDetailModal({ userId, onClose }: Props) {
       });
 
     supabase
-      .rpc('get_recent_matches', { p_user_id: userId, p_limit: 5 })
+      .rpc('badminton_get_recent_matches', { p_user_id: userId, p_limit: 5 })
       .then(({ data, error }) => {
         if (!active) return;
         if (error) {
@@ -82,7 +82,7 @@ export function ProfileDetailModal({ userId, onClose }: Props) {
       });
 
     supabase
-      .from('season_snapshots')
+      .from('badminton_season_snapshots')
       .select(
         'season_number, archived_at, singles_rating, doubles_rating, singles_games_played, doubles_games_played, singles_wins, doubles_wins, singles_rank, doubles_rank',
       )

@@ -41,8 +41,8 @@ export function NotificationBell() {
       // orphaned by a rejection / expiry inflate the badge while the
       // popover (which joins to matches.status='pending') stays empty.
       const { count } = await supabase
-        .from('match_participants')
-        .select('*, matches!inner(status)', { count: 'exact', head: true })
+        .from('badminton_match_participants')
+        .select('*, matches:badminton_matches!inner(status)', { count: 'exact', head: true })
         .eq('user_id', user!.id)
         .eq('confirmation', 'pending')
         .eq('matches.status', 'pending');
@@ -58,7 +58,7 @@ export function NotificationBell() {
         {
           event: '*',
           schema: 'public',
-          table: 'match_participants',
+          table: 'badminton_match_participants',
           filter: `user_id=eq.${user.id}`,
         },
         () => {
@@ -84,7 +84,7 @@ export function NotificationBell() {
       // Pull last-seen cutoff fresh each time so a stamp from a
       // sibling tab is reflected.
       const { data: profile } = await supabase
-        .from('profiles')
+        .from('badminton_profiles')
         .select('notifications_last_seen_at')
         .eq('id', user!.id)
         .maybeSingle();
@@ -100,12 +100,12 @@ export function NotificationBell() {
       .channel(`bell-chat-${user.id}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'chat_messages' },
+        { event: '*', schema: 'public', table: 'badminton_chat_messages' },
         () => refresh(),
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'chat_reactions' },
+        { event: '*', schema: 'public', table: 'badminton_chat_reactions' },
         () => refresh(),
       )
       .subscribe();

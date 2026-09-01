@@ -27,11 +27,11 @@
 -- 1. is_anonymous column on profiles
 -- =========================================================================
 
-alter table public.profiles
+alter table public.badminton_profiles
   add column if not exists is_anonymous boolean not null default false;
 
-create index if not exists profiles_anonymous_idx
-  on public.profiles (id) where is_anonymous = true;
+create index if not exists badminton_profiles_anonymous_idx
+  on public.badminton_profiles (id) where is_anonymous = true;
 
 -- =========================================================================
 -- 2. slot column on match_participants
@@ -40,17 +40,17 @@ create index if not exists profiles_anonymous_idx
 --    "no duplicate real players in one match" invariant.
 -- =========================================================================
 
-alter table public.match_participants
+alter table public.badminton_match_participants
   add column if not exists slot smallint not null default 0;
 
 do $$ begin
-  alter table public.match_participants
+  alter table public.badminton_match_participants
     drop constraint if exists match_participants_pkey;
 exception when others then null;
 end $$;
 
 do $$ begin
-  alter table public.match_participants
+  alter table public.badminton_match_participants
     add primary key (match_id, user_id, slot);
 exception when invalid_table_definition then null;
        when duplicate_table then null;
@@ -58,16 +58,16 @@ end $$;
 
 -- One row per real player per match. Anonymous (the only id that may
 -- repeat) is exempted.
-create unique index if not exists match_participants_unique_real_player
-  on public.match_participants (match_id, user_id)
+create unique index if not exists badminton_match_participants_unique_real_player
+  on public.badminton_match_participants (match_id, user_id)
   where user_id <> '00000000-0000-0000-0000-000000000001'::uuid;
 
 -- =========================================================================
--- 3. 'awaiting_admin' status value on match_status
+-- 3. 'awaiting_admin' status value on badminton_match_status
 -- =========================================================================
 
 do $$ begin
-  alter type match_status add value if not exists 'awaiting_admin';
+  alter type badminton_match_status add value if not exists 'awaiting_admin';
 exception when others then null;
 end $$;
 
@@ -78,7 +78,7 @@ end $$;
 --    encrypted_password is a placeholder (never used for sign-in).
 -- =========================================================================
 
-create or replace function public.anonymous_user_id()
+create or replace function public.badminton_anonymous_user_id()
 returns uuid
 language sql
 immutable
@@ -86,7 +86,7 @@ as $$
   select '00000000-0000-0000-0000-000000000001'::uuid;
 $$;
 
-grant execute on function public.anonymous_user_id() to authenticated, anon;
+grant execute on function public.badminton_anonymous_user_id() to authenticated, anon;
 
 do $$
 declare
@@ -122,10 +122,10 @@ begin
   end if;
 end $$;
 
--- Ensure the profile row exists and is flagged. on_auth_user_created
+-- Ensure the profile row exists and is flagged. badminton_on_auth_user_created
 -- from 0001 may have already auto-created it; this normalizes the
 -- fields either way.
-insert into public.profiles (id, display_name, is_anonymous)
+insert into public.badminton_profiles (id, display_name, is_anonymous)
 values ('00000000-0000-0000-0000-000000000001'::uuid, 'Anonymous', true)
 on conflict (id) do update
   set display_name = 'Anonymous',
@@ -136,7 +136,7 @@ on conflict (id) do update
 --    plays as a neutral opponent in ELO math.
 -- =========================================================================
 
-create or replace function public.refresh_anonymous_rating()
+create or replace function public.badminton_refresh_anonymous_rating()
 returns void
 language plpgsql
 security definer
@@ -150,31 +150,31 @@ begin
     avg(singles_rating) filter (where singles_games_played > 0),
     avg(doubles_rating) filter (where doubles_games_played > 0)
     into avg_s, avg_d
-  from public.profiles
+  from public.badminton_profiles
   where is_anonymous = false
     and is_banned = false;
 
-  update public.profiles
+  update public.badminton_profiles
      set singles_rating = coalesce(round(avg_s)::int, 1000),
          doubles_rating = coalesce(round(avg_d)::int, 1000)
-   where id = public.anonymous_user_id();
+   where id = public.badminton_anonymous_user_id();
 end;
 $$;
 
-grant execute on function public.refresh_anonymous_rating() to authenticated;
+grant execute on function public.badminton_refresh_anonymous_rating() to authenticated;
 
-select public.refresh_anonymous_rating();
+select public.badminton_refresh_anonymous_rating();
 
 -- =========================================================================
 -- 6. Auto-accept anonymous slots on insert
 -- =========================================================================
 
-create or replace function public.auto_accept_anonymous()
+create or replace function public.badminton_auto_accept_anonymous()
 returns trigger
 language plpgsql
 as $$
 begin
-  if new.user_id = public.anonymous_user_id() then
+  if new.user_id = public.badminton_anonymous_user_id() then
     new.confirmation := 'accepted';
     new.responded_at := now();
   end if;
@@ -182,10 +182,10 @@ begin
 end;
 $$;
 
-drop trigger if exists trg_auto_accept_anonymous on public.match_participants;
+drop trigger if exists trg_auto_accept_anonymous on public.badminton_match_participants;
 create trigger trg_auto_accept_anonymous
-  before insert on public.match_participants
-  for each row execute function public.auto_accept_anonymous();
+  before insert on public.badminton_match_participants
+  for each row execute function public.badminton_auto_accept_anonymous();
 
 -- =========================================================================
 -- 7. Refactor settle_match
@@ -195,7 +195,7 @@ create trigger trg_auto_accept_anonymous
 --    and the admin-approval path.
 -- =========================================================================
 
-create or replace function public._settle_match_elo(p_match_id uuid)
+create or replace function public.badminton__settle_match_elo(p_match_id uuid)
 returns void
 language plpgsql
 security definer
@@ -210,7 +210,7 @@ declare
   margin_deadband constant int := 2;
   margin_divisor constant numeric := 21;
   margin_max_mult constant numeric := 2;
-  v_anon uuid := public.anonymous_user_id();
+  v_anon uuid := public.badminton_anonymous_user_id();
   rating_a numeric;
   rating_b numeric;
   expected_a numeric;
@@ -230,9 +230,9 @@ declare
   delta int;
   score_diff int;
   margin_mult numeric;
-  winning_team match_team;
+  winning_team badminton_match_team;
 begin
-  select * into m from public.matches where id = p_match_id for update;
+  select * into m from public.badminton_matches where id = p_match_id for update;
   if not found then
     return;
   end if;
@@ -251,17 +251,17 @@ begin
   -- naturally because it's a real number on the profile row.
   execute format(
     'select avg(p.%I)::numeric
-       from public.match_participants mp
-       join public.profiles p on p.id = mp.user_id
-      where mp.match_id = $1 and mp.team = $2::match_team',
+       from public.badminton_match_participants mp
+       join public.badminton_profiles p on p.id = mp.user_id
+      where mp.match_id = $1 and mp.team = $2::badminton_match_team',
     rating_col
   ) using p_match_id, 'A' into rating_a;
 
   execute format(
     'select avg(p.%I)::numeric
-       from public.match_participants mp
-       join public.profiles p on p.id = mp.user_id
-      where mp.match_id = $1 and mp.team = $2::match_team',
+       from public.badminton_match_participants mp
+       join public.badminton_profiles p on p.id = mp.user_id
+      where mp.match_id = $1 and mp.team = $2::badminton_match_team',
     rating_col
   ) using p_match_id, 'B' into rating_b;
 
@@ -288,14 +288,14 @@ begin
   -- end via refresh_anonymous_rating().
   for participant in
     select user_id, team, slot
-      from public.match_participants
+      from public.badminton_match_participants
      where match_id = p_match_id
   loop
-    execute format('select %I, %I from public.profiles where id = $1', rating_col, games_col)
+    execute format('select %I, %I from public.badminton_profiles where id = $1', rating_col, games_col)
       using participant.user_id into current_rating, current_games;
 
     if participant.user_id = v_anon then
-      update public.match_participants
+      update public.badminton_match_participants
          set rating_before = current_rating,
              rating_after = current_rating,
              rating_delta = 0
@@ -321,7 +321,7 @@ begin
 
     delta := round(effective_k * (team_actual - team_expected));
 
-    update public.match_participants
+    update public.badminton_match_participants
        set rating_before = current_rating,
            rating_after = current_rating + delta,
            rating_delta = delta
@@ -330,7 +330,7 @@ begin
        and slot = participant.slot;
 
     execute format(
-      'update public.profiles
+      'update public.badminton_profiles
           set %I = %I + $1,
               %I = %I + 1,
               %I = greatest(%I, %I + $1)
@@ -341,18 +341,18 @@ begin
     ) using delta, participant.user_id;
   end loop;
 
-  update public.matches
+  update public.badminton_matches
      set status = 'confirmed', confirmed_at = now(), elo_version = 2
    where id = p_match_id;
 
   -- Anonymous's rating drifts with the club average. Recompute after
   -- every settlement so the next match using anonymous uses the
   -- up-to-date avg.
-  perform public.refresh_anonymous_rating();
+  perform public.badminton_refresh_anonymous_rating();
 end;
 $$;
 
-create or replace function public.settle_match(p_match_id uuid)
+create or replace function public.badminton_settle_match(p_match_id uuid)
 returns void
 language plpgsql
 security definer
@@ -362,17 +362,17 @@ declare
   m record;
   has_anon boolean;
 begin
-  select * into m from public.matches where id = p_match_id for update;
+  select * into m from public.badminton_matches where id = p_match_id for update;
   if not found or m.status <> 'pending' then
     return;
   end if;
 
   -- One acceptance per team is enough. Bail if either side has none.
   if not exists (
-    select 1 from public.match_participants
+    select 1 from public.badminton_match_participants
      where match_id = p_match_id and team = 'A' and confirmation = 'accepted'
   ) or not exists (
-    select 1 from public.match_participants
+    select 1 from public.badminton_match_participants
      where match_id = p_match_id and team = 'B' and confirmation = 'accepted'
   ) then
     return;
@@ -381,19 +381,19 @@ begin
   -- Anonymous-tainted? Park for admin approval — the extra layer is
   -- specifically to prevent abuse of the auto-accept flow.
   select exists (
-    select 1 from public.match_participants
+    select 1 from public.badminton_match_participants
      where match_id = p_match_id
-       and user_id = public.anonymous_user_id()
+       and user_id = public.badminton_anonymous_user_id()
   ) into has_anon;
 
   if has_anon then
-    update public.matches
+    update public.badminton_matches
        set status = 'awaiting_admin'
      where id = p_match_id;
     return;
   end if;
 
-  perform public._settle_match_elo(p_match_id);
+  perform public.badminton__settle_match_elo(p_match_id);
 end;
 $$;
 
@@ -401,7 +401,7 @@ $$;
 -- 8. Admin approve / reject RPCs
 -- =========================================================================
 
-create or replace function public.approve_anonymous_match(p_match_id uuid)
+create or replace function public.badminton_approve_anonymous_match(p_match_id uuid)
 returns void
 language plpgsql
 security definer
@@ -409,16 +409,16 @@ set search_path = public
 as $$
 declare
   v_admin boolean;
-  v_status match_status;
+  v_status badminton_match_status;
 begin
   select is_admin into v_admin
-    from public.profiles where id = auth.uid();
+    from public.badminton_profiles where id = auth.uid();
   if not coalesce(v_admin, false) then
     raise exception 'Only admins can approve matches';
   end if;
 
   select status into v_status
-    from public.matches where id = p_match_id for update;
+    from public.badminton_matches where id = p_match_id for update;
   if v_status is null then
     raise exception 'Match not found';
   end if;
@@ -426,13 +426,13 @@ begin
     raise exception 'Match is not awaiting admin approval';
   end if;
 
-  perform public._settle_match_elo(p_match_id);
+  perform public.badminton__settle_match_elo(p_match_id);
 end;
 $$;
 
-grant execute on function public.approve_anonymous_match(uuid) to authenticated;
+grant execute on function public.badminton_approve_anonymous_match(uuid) to authenticated;
 
-create or replace function public.reject_anonymous_match(p_match_id uuid)
+create or replace function public.badminton_reject_anonymous_match(p_match_id uuid)
 returns void
 language plpgsql
 security definer
@@ -440,16 +440,16 @@ set search_path = public
 as $$
 declare
   v_admin boolean;
-  v_status match_status;
+  v_status badminton_match_status;
 begin
   select is_admin into v_admin
-    from public.profiles where id = auth.uid();
+    from public.badminton_profiles where id = auth.uid();
   if not coalesce(v_admin, false) then
     raise exception 'Only admins can reject matches';
   end if;
 
   select status into v_status
-    from public.matches where id = p_match_id for update;
+    from public.badminton_matches where id = p_match_id for update;
   if v_status is null then
     raise exception 'Match not found';
   end if;
@@ -457,20 +457,20 @@ begin
     raise exception 'Match is not awaiting admin approval';
   end if;
 
-  update public.matches
+  update public.badminton_matches
      set status = 'rejected'
    where id = p_match_id;
 end;
 $$;
 
-grant execute on function public.reject_anonymous_match(uuid) to authenticated;
+grant execute on function public.badminton_reject_anonymous_match(uuid) to authenticated;
 
 -- =========================================================================
 -- 9. RLS — admins need to read awaiting-admin matches + participants
 --    even when not a participant themselves.
 -- =========================================================================
 
-create or replace function public.is_caller_admin()
+create or replace function public.badminton_is_caller_admin()
 returns boolean
 language sql
 stable
@@ -478,35 +478,35 @@ security definer
 set search_path = public
 as $$
   select coalesce(
-    (select is_admin from public.profiles where id = auth.uid()),
+    (select is_admin from public.badminton_profiles where id = auth.uid()),
     false
   );
 $$;
 
-grant execute on function public.is_caller_admin() to authenticated;
+grant execute on function public.badminton_is_caller_admin() to authenticated;
 
-drop policy if exists "Matches visible to participants" on public.matches;
+drop policy if exists "Matches visible to participants" on public.badminton_matches;
 create policy "Matches visible to participants"
-  on public.matches for select
+  on public.badminton_matches for select
   to authenticated
   using (
     auth.uid() = created_by
-    or public.is_match_participant(id, auth.uid())
-    or public.is_caller_admin()
+    or public.badminton_is_match_participant(id, auth.uid())
+    or public.badminton_is_caller_admin()
   );
 
-drop policy if exists "Participants visible to involved users" on public.match_participants;
+drop policy if exists "Participants visible to involved users" on public.badminton_match_participants;
 create policy "Participants visible to involved users"
-  on public.match_participants for select
+  on public.badminton_match_participants for select
   to authenticated
   using (
     user_id = auth.uid()
-    or public.is_match_participant(match_id, auth.uid())
+    or public.badminton_is_match_participant(match_id, auth.uid())
     or exists (
-      select 1 from public.matches m
-       where m.id = match_participants.match_id and m.created_by = auth.uid()
+      select 1 from public.badminton_matches m
+       where m.id = badminton_match_participants.match_id and m.created_by = auth.uid()
     )
-    or public.is_caller_admin()
+    or public.badminton_is_caller_admin()
   );
 
 -- =========================================================================
@@ -514,7 +514,7 @@ create policy "Participants visible to involved users"
 -- =========================================================================
 
 -- ban_user must refuse the anonymous account.
-create or replace function public.ban_user(
+create or replace function public.badminton_ban_user(
   p_target_id uuid,
   p_reason text default null
 ) returns void
@@ -530,7 +530,7 @@ declare
   v_admin_name text;
 begin
   select is_admin into v_admin
-    from public.profiles
+    from public.badminton_profiles
    where id = auth.uid();
   if not coalesce(v_admin, false) then
     raise exception 'Only admins can ban users';
@@ -538,12 +538,12 @@ begin
   if p_target_id = auth.uid() then
     raise exception 'You cannot ban yourself';
   end if;
-  if p_target_id = public.anonymous_user_id() then
+  if p_target_id = public.badminton_anonymous_user_id() then
     raise exception 'You cannot ban the anonymous player';
   end if;
 
   select is_admin, is_anonymous into v_target_admin, v_target_anon
-    from public.profiles
+    from public.badminton_profiles
    where id = p_target_id;
   if coalesce(v_target_admin, false) then
     raise exception 'You cannot ban another admin';
@@ -552,7 +552,7 @@ begin
     raise exception 'You cannot ban the anonymous player';
   end if;
 
-  update public.profiles
+  update public.badminton_profiles
      set is_banned = true,
          banned_at = now(),
          banned_by = auth.uid(),
@@ -561,9 +561,9 @@ begin
    returning display_name into v_target_name;
 
   select display_name into v_admin_name
-    from public.profiles where id = auth.uid();
+    from public.badminton_profiles where id = auth.uid();
 
-  insert into public.chat_messages
+  insert into public.badminton_chat_messages
     (kind, user_id, body, expires_at)
   values (
     'system_user_banned',
@@ -576,14 +576,14 @@ begin
   -- The newly-banned player drops out of the active pool, which can
   -- shift the club average. Recompute anonymous's rating so the next
   -- match using anon prices it correctly.
-  perform public.refresh_anonymous_rating();
+  perform public.badminton_refresh_anonymous_rating();
 end;
 $$;
 
-grant execute on function public.ban_user(uuid, text) to authenticated;
+grant execute on function public.badminton_ban_user(uuid, text) to authenticated;
 
 -- unban_user — same refresh reasoning. Override the version from 0008.
-create or replace function public.unban_user(p_target_id uuid)
+create or replace function public.badminton_unban_user(p_target_id uuid)
 returns void
 language plpgsql
 security definer
@@ -593,29 +593,29 @@ declare
   v_admin boolean;
 begin
   select is_admin into v_admin
-    from public.profiles
+    from public.badminton_profiles
    where id = auth.uid();
   if not coalesce(v_admin, false) then
     raise exception 'Only admins can unban users';
   end if;
-  update public.profiles
+  update public.badminton_profiles
      set is_banned = false,
          banned_at = null,
          banned_by = null,
          banned_reason = null
    where id = p_target_id;
 
-  perform public.refresh_anonymous_rating();
+  perform public.badminton_refresh_anonymous_rating();
 end;
 $$;
 
-grant execute on function public.unban_user(uuid) to authenticated;
+grant execute on function public.badminton_unban_user(uuid) to authenticated;
 
 -- =========================================================================
 -- 11. update_pending_match — relax uniqueness for anonymous
 -- =========================================================================
 
-create or replace function public.update_pending_match(
+create or replace function public.badminton_update_pending_match(
   p_match_id uuid,
   p_partner_id uuid,
   p_opponent_ids uuid[],
@@ -629,13 +629,13 @@ as $$
 declare
   m record;
   v_caller uuid := auth.uid();
-  v_anon uuid := public.anonymous_user_id();
+  v_anon uuid := public.badminton_anonymous_user_id();
   v_idx int;
   v_oid uuid;
   v_slot_counter jsonb := '{}'::jsonb;
   v_slot int;
 begin
-  select * into m from public.matches where id = p_match_id for update;
+  select * into m from public.badminton_matches where id = p_match_id for update;
   if not found then
     raise exception 'Match not found';
   end if;
@@ -647,7 +647,7 @@ begin
   end if;
 
   if exists (
-    select 1 from public.match_participants
+    select 1 from public.badminton_match_participants
      where match_id = p_match_id
        and user_id <> v_caller
        and confirmation = 'accepted'
@@ -696,22 +696,22 @@ begin
     end if;
   end if;
 
-  update public.matches
+  update public.badminton_matches
      set score_a = p_score_a,
          score_b = p_score_b
    where id = p_match_id;
 
-  delete from public.match_participants where match_id = p_match_id;
+  delete from public.badminton_match_participants where match_id = p_match_id;
 
   -- Re-insert with slot indices. Slot starts at 0 for each user_id and
   -- increments per duplicate (only anonymous can duplicate). Anonymous
   -- rows auto-accept via the BEFORE INSERT trigger.
-  insert into public.match_participants (match_id, user_id, team, slot, confirmation)
+  insert into public.badminton_match_participants (match_id, user_id, team, slot, confirmation)
   values (p_match_id, v_caller, 'A', 0, 'accepted');
 
   if m.match_type = 'doubles' then
     v_slot := case when p_partner_id = v_anon then 0 else 0 end;
-    insert into public.match_participants (match_id, user_id, team, slot, confirmation)
+    insert into public.badminton_match_participants (match_id, user_id, team, slot, confirmation)
     values (p_match_id, p_partner_id, 'A', v_slot, 'pending');
     if p_partner_id = v_anon then
       v_slot_counter := jsonb_set(
@@ -730,11 +730,11 @@ begin
     else
       v_slot := 0;
     end if;
-    insert into public.match_participants (match_id, user_id, team, slot, confirmation)
+    insert into public.badminton_match_participants (match_id, user_id, team, slot, confirmation)
     values (p_match_id, v_oid, 'B', v_slot, 'pending');
     v_idx := v_idx + 1;
   end loop;
 end;
 $$;
 
-grant execute on function public.update_pending_match(uuid, uuid, uuid[], int, int) to authenticated;
+grant execute on function public.badminton_update_pending_match(uuid, uuid, uuid[], int, int) to authenticated;

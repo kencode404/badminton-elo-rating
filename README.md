@@ -22,15 +22,27 @@ npm test
 
 ## Database setup
 
-Open the Supabase SQL editor for your project and run [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql). It creates:
+The app lives in a Supabase project that is **shared with another app**, so every
+database object is prefixed `badminton_` (tables, enum types, functions/RPCs,
+indexes, the `auth.users` trigger, the `badminton_avatars` storage bucket).
+Keep that prefix on anything new.
 
-- `profiles`, `matches`, `match_participants` tables
-- Auth trigger that auto-creates a profile row on sign-up
+Open the Supabase SQL editor for the project and run the files in
+[supabase/migrations/](supabase/migrations/) in order (`0001` … `0015`; all are
+idempotent). Together they create:
+
+- `badminton_profiles`, `badminton_matches`, `badminton_match_participants`, chat, season tables
+- Auth trigger that auto-creates a profile row on sign-up — only for sign-ups tagged
+  `app = 'badminton'` in user metadata, because `auth.users` is shared; other sign-ins
+  (Google, accounts from the other app) get a profile via `badminton_ensure_profile()`
 - Match-validation trigger (team sizes, no duplicate players)
 - ELO settlement trigger that fires when the last participant confirms
-- Row Level Security policies on all three tables
+- Row Level Security policies on all tables
 - Realtime publications for live notifications
-- `expire_old_matches()` function (call from a scheduled job)
+- `badminton_expire_old_matches()` function (call from a scheduled job)
+
+Moving data from the previous stand-alone project: see
+[scripts/migrate-to-shared/README.md](scripts/migrate-to-shared/README.md).
 
 ## Project layout
 

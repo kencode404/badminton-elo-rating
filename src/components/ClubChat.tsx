@@ -134,7 +134,7 @@ export function ClubChat() {
     async function loadMessages() {
       const nowIso = new Date().toISOString();
       const { data, error } = await supabase
-        .from('chat_messages')
+        .from('badminton_chat_messages')
         .select(
           'id, kind, user_id, body, match_type, streak_count, tier_key, breaker_user_ids, reply_to_message_id, mentioned_user_ids, created_at, profiles:user_id(display_name, avatar_url)',
         )
@@ -180,7 +180,7 @@ export function ClubChat() {
       }
       if (idsToResolve.size > 0) {
         const { data: profs } = await supabase
-          .from('profiles')
+          .from('badminton_profiles')
           .select('id, display_name')
           .in('id', Array.from(idsToResolve));
         if (active && profs) {
@@ -197,7 +197,7 @@ export function ClubChat() {
 
     async function loadReactions() {
       const { data, error } = await supabase
-        .from('chat_reactions')
+        .from('badminton_chat_reactions')
         .select('message_id, user_id, emoji, profiles:user_id(display_name, avatar_url)');
       if (!active) return;
       if (error) {
@@ -238,12 +238,12 @@ export function ClubChat() {
       .channel(`club-chat-${user.id}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'chat_messages' },
+        { event: '*', schema: 'public', table: 'badminton_chat_messages' },
         () => loadMessages(),
       )
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'chat_reactions' },
+        { event: 'INSERT', schema: 'public', table: 'badminton_chat_reactions' },
         (payload) => {
           const r = payload.new as ReactionPayload;
           setReactions((rs) => {
@@ -269,7 +269,7 @@ export function ClubChat() {
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'chat_reactions' },
+        { event: 'UPDATE', schema: 'public', table: 'badminton_chat_reactions' },
         (payload) => {
           const r = payload.new as ReactionPayload;
           setReactions((rs) =>
@@ -283,7 +283,7 @@ export function ClubChat() {
       )
       .on(
         'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'chat_reactions' },
+        { event: 'DELETE', schema: 'public', table: 'badminton_chat_reactions' },
         (payload) => {
           const r = payload.old as { message_id?: string; user_id?: string };
           if (!r.message_id || !r.user_id) return;
@@ -323,7 +323,7 @@ export function ClubChat() {
     if (!user) return;
     let active = true;
     supabase
-      .from('profiles')
+      .from('badminton_profiles')
       .select('chat_last_seen_at')
       .eq('id', user.id)
       .maybeSingle()
@@ -478,7 +478,7 @@ export function ClubChat() {
         .map((m) => m.id);
       setSending(true);
       setError(null);
-      const { error } = await supabase.from('chat_messages').insert({
+      const { error } = await supabase.from('badminton_chat_messages').insert({
         kind: 'user',
         user_id: user.id,
         body,
@@ -536,7 +536,7 @@ export function ClubChat() {
     const trimmed = mentionQuery.trim();
     const t = window.setTimeout(async () => {
       let q = supabase
-        .from('profiles')
+        .from('badminton_profiles')
         .select('id, display_name, avatar_url')
         .eq('is_banned', false)
         .eq('is_anonymous', false)
@@ -602,7 +602,7 @@ export function ClubChat() {
   const unsendMessage = useCallback(
     async (messageId: string) => {
       const { error } = await supabase
-        .from('chat_messages')
+        .from('badminton_chat_messages')
         .delete()
         .eq('id', messageId);
       if (error) {
@@ -669,11 +669,11 @@ export function ClubChat() {
       const result =
         mine && mine.emoji === emoji
           ? await supabase
-              .from('chat_reactions')
+              .from('badminton_chat_reactions')
               .delete()
               .eq('message_id', messageId)
               .eq('user_id', myUserId)
-          : await supabase.from('chat_reactions').upsert(
+          : await supabase.from('badminton_chat_reactions').upsert(
               { message_id: messageId, user_id: myUserId, emoji },
               { onConflict: 'message_id,user_id' },
             );

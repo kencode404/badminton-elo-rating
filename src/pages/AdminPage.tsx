@@ -10,7 +10,7 @@ import {
 } from '../lib/queries';
 import type { Database } from '../lib/database.types';
 
-type Profile = Database['public']['Tables']['profiles']['Row'];
+type Profile = Database['public']['Tables']['badminton_profiles']['Row'];
 type ProfileLite = Pick<
   Profile,
   | 'id'
@@ -40,7 +40,7 @@ export function AdminPage() {
     let active = true;
     setLoadingMe(true);
     supabase
-      .from('profiles')
+      .from('badminton_profiles')
       .select('*')
       .eq('id', user.id)
       .maybeSingle()
@@ -253,7 +253,7 @@ function SeasonResetCard() {
     if (confirmText.trim().toUpperCase() !== RESET_PHRASE) return;
     setResetting(true);
     setError(null);
-    const { data, error } = await supabase.rpc('reset_season');
+    const { data, error } = await supabase.rpc('badminton_reset_season');
     setResetting(false);
     if (error) {
       setError(formatError(error));
@@ -373,7 +373,7 @@ function BanUserCard({ adminId }: { adminId: string }) {
     }
     const t = setTimeout(async () => {
       const { data } = await supabase
-        .from('profiles')
+        .from('badminton_profiles')
         .select('id, display_name, avatar_url, is_admin, is_banned, banned_at, banned_reason')
         .ilike('display_name', `%${trimmed}%`)
         .eq('is_banned', false)
@@ -395,7 +395,7 @@ function BanUserCard({ adminId }: { adminId: string }) {
     setSubmitting(true);
     setError(null);
     setSuccess(null);
-    const { error } = await supabase.rpc('ban_user', {
+    const { error } = await supabase.rpc('badminton_ban_user', {
       p_target_id: target.id,
       p_reason: reason.trim() || null,
     });
@@ -527,7 +527,7 @@ function BannedRosterCard() {
   useEffect(() => {
     let active = true;
     supabase
-      .from('profiles')
+      .from('badminton_profiles')
       .select('id, display_name, avatar_url, is_admin, is_banned, banned_at, banned_reason')
       .eq('is_banned', true)
       .order('banned_at', { ascending: false })
@@ -544,7 +544,7 @@ function BannedRosterCard() {
   async function unban(id: string) {
     setUnbanning(id);
     setError(null);
-    const { error } = await supabase.rpc('unban_user', { p_target_id: id });
+    const { error } = await supabase.rpc('badminton_unban_user', { p_target_id: id });
     setUnbanning(null);
     if (error) {
       setError(formatError(error));

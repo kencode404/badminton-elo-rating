@@ -10,16 +10,16 @@
 -- Safe to rerun.
 
 do $$ begin
-  alter publication supabase_realtime add table public.chat_messages;
+  alter publication supabase_realtime add table public.badminton_chat_messages;
 exception when duplicate_object then null;
 end $$;
 
 do $$ begin
-  alter publication supabase_realtime add table public.chat_reactions;
+  alter publication supabase_realtime add table public.badminton_chat_reactions;
 exception when duplicate_object then null;
 end $$;
 
 do $$ begin
-  alter publication supabase_realtime add table public.profiles;
+  alter publication supabase_realtime add table public.badminton_profiles;
 exception when duplicate_object then null;
 end $$;

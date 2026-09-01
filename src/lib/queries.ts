@@ -25,9 +25,9 @@ import type { Database } from './database.types';
 // background revalidation runs. Mutations either invalidate the
 // affected key (refetch) or patch the cache directly (optimistic).
 
-type Profile = Database['public']['Tables']['profiles']['Row'];
+type Profile = Database['public']['Tables']['badminton_profiles']['Row'];
 type ProfileLite = Pick<Profile, 'id' | 'display_name' | 'avatar_url'>;
-type Match = Database['public']['Tables']['matches']['Row'];
+type Match = Database['public']['Tables']['badminton_matches']['Row'];
 type Team = 'A' | 'B';
 
 // ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ export function useMyProfile(userId: string | undefined) {
       // (calls claim_pet_daily). We do still need the timestamp
       // here so the basket can show pending shards.
       const { data, error } = await supabase
-        .from('profiles')
+        .from('badminton_profiles')
         .select('shards, armed_shield, armed_booster, owned_pets, equipped_pet, singles_rating, singles_games_played, doubles_rating, doubles_games_played, pets_last_payout_at')
         .eq('id', userId!)
         .maybeSingle();
@@ -230,7 +230,7 @@ export function useBuyShield(userId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (kind: 'iron' | 'aura') => {
-      const { data, error } = await supabase.rpc('buy_shield', { p_kind: kind });
+      const { data, error } = await supabase.rpc('badminton_buy_shield', { p_kind: kind });
       if (error) throw error;
       return data as number;
     },
@@ -270,7 +270,7 @@ export function useBuyPet(userId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (kind: PetKind) => {
-      const { data, error } = await supabase.rpc('buy_pet', { p_kind: kind });
+      const { data, error } = await supabase.rpc('badminton_buy_pet', { p_kind: kind });
       if (error) throw error;
       return data as number;
     },
@@ -315,7 +315,7 @@ export function useClaimPetDaily(userId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.rpc('claim_pet_daily');
+      const { data, error } = await supabase.rpc('badminton_claim_pet_daily');
       if (error) throw error;
       return data as number;
     },
@@ -330,7 +330,7 @@ export function useEquipPet(userId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (kind: PetKind | null) => {
-      const { error } = await supabase.rpc('equip_pet', { p_kind: kind });
+      const { error } = await supabase.rpc('badminton_equip_pet', { p_kind: kind });
       if (error) throw error;
     },
     onMutate: async (kind) => {
@@ -359,7 +359,7 @@ export function useBuyBooster(userId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (kind: 'shuttle') => {
-      const { data, error } = await supabase.rpc('buy_booster', { p_kind: kind });
+      const { data, error } = await supabase.rpc('badminton_buy_booster', { p_kind: kind });
       if (error) throw error;
       return data as number;
     },
@@ -403,7 +403,7 @@ export function useLeaderboard(tab: 'singles' | 'doubles') {
       const gamesCol =
         tab === 'singles' ? 'singles_games_played' : 'doubles_games_played';
       const { data, error } = await supabase
-        .from('profiles')
+        .from('badminton_profiles')
         .select('*')
         .eq('is_banned', false)
         .eq('is_anonymous', false)
@@ -429,7 +429,7 @@ export function useWinStreaks() {
   return useQuery({
     queryKey: qk.winStreaks(),
     queryFn: async (): Promise<StreakRow[]> => {
-      const { data, error } = await supabase.rpc('get_win_streaks');
+      const { data, error } = await supabase.rpc('badminton_get_win_streaks');
       if (error) throw error;
       return (data ?? []) as StreakRow[];
     },
@@ -459,7 +459,7 @@ export function useAwaitingAdminMatches(enabled = true) {
     refetchOnMount: 'always',
     queryFn: async (): Promise<AwaitingAdminMatch[]> => {
       const { data: matches, error: e1 } = await supabase
-        .from('matches')
+        .from('badminton_matches')
         .select('id, match_type, score_a, score_b, played_at, created_by')
         .eq('status', 'awaiting_admin')
         .order('played_at', { ascending: false });
@@ -472,11 +472,11 @@ export function useAwaitingAdminMatches(enabled = true) {
       const [{ data: parts, error: e2 }, { data: profs, error: e3 }] =
         await Promise.all([
           supabase
-            .from('match_participants')
+            .from('badminton_match_participants')
             .select('match_id, user_id, team, profiles:user_id(display_name)')
             .in('match_id', ids),
           supabase
-            .from('profiles')
+            .from('badminton_profiles')
             .select('id, display_name')
             .in('id', creatorIds),
         ]);
@@ -543,8 +543,8 @@ export function useAdminMatchAction(
     mutationFn: async (vars) => {
       const fn =
         vars.action === 'approve'
-          ? 'approve_anonymous_match'
-          : 'reject_anonymous_match';
+          ? 'badminton_approve_anonymous_match'
+          : 'badminton_reject_anonymous_match';
       const { error } = await supabase.rpc(fn, { p_match_id: vars.matchId });
       if (error) throw error;
     },

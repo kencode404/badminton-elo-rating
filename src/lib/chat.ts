@@ -24,7 +24,7 @@ export function useChatUnread(): number {
 
     async function refresh() {
       const { data: profile } = await supabase
-        .from('profiles')
+        .from('badminton_profiles')
         .select('chat_last_seen_at')
         .eq('id', user!.id)
         .maybeSingle();
@@ -32,7 +32,7 @@ export function useChatUnread(): number {
 
       const nowIso = new Date().toISOString();
       const { count: c } = await supabase
-        .from('chat_messages')
+        .from('badminton_chat_messages')
         .select('*', { count: 'exact', head: true })
         .gt('created_at', lastSeen)
         .or(`expires_at.is.null,expires_at.gt.${nowIso}`);
@@ -50,7 +50,7 @@ export function useChatUnread(): number {
       .channel(`chat-unread-${user.id}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'chat_messages' },
+        { event: '*', schema: 'public', table: 'badminton_chat_messages' },
         () => refresh(),
       )
       .on(
@@ -58,7 +58,7 @@ export function useChatUnread(): number {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'profiles',
+          table: 'badminton_profiles',
           filter: `id=eq.${user.id}`,
         },
         () => refresh(),
@@ -81,7 +81,7 @@ export function useChatUnread(): number {
 export async function markChatSeen(userId: string): Promise<void> {
   window.dispatchEvent(new Event(CHAT_SEEN_EVENT));
   await supabase
-    .from('profiles')
+    .from('badminton_profiles')
     .update({ chat_last_seen_at: new Date().toISOString() })
     .eq('id', userId);
 }

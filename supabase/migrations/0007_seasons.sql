@@ -11,7 +11,7 @@
 --   * one-shot grant making khieng96@gmail.com an admin
 --
 -- Safe to rerun. To grant another email later:
---   update public.profiles
+--   update public.badminton_profiles
 --      set is_admin = true
 --    where id = (select id from auth.users where email = 'YOUR_EMAIL');
 
@@ -19,9 +19,9 @@
 -- 1. season_snapshots
 -- =========================================================================
 
-create table if not exists public.season_snapshots (
-  user_id uuid not null references public.profiles(id) on delete cascade,
-  season_number int not null references public.seasons(number) on delete cascade,
+create table if not exists public.badminton_season_snapshots (
+  user_id uuid not null references public.badminton_profiles(id) on delete cascade,
+  season_number int not null references public.badminton_seasons(number) on delete cascade,
   archived_at timestamptz not null default now(),
   singles_rating int not null,
   doubles_rating int not null,
@@ -36,14 +36,14 @@ create table if not exists public.season_snapshots (
   primary key (user_id, season_number)
 );
 
-create index if not exists season_snapshots_user_idx
-  on public.season_snapshots (user_id, season_number desc);
+create index if not exists badminton_season_snapshots_user_idx
+  on public.badminton_season_snapshots (user_id, season_number desc);
 
-alter table public.season_snapshots enable row level security;
+alter table public.badminton_season_snapshots enable row level security;
 
-drop policy if exists "Snapshots readable by all" on public.season_snapshots;
+drop policy if exists "Snapshots readable by all" on public.badminton_season_snapshots;
 create policy "Snapshots readable by all"
-  on public.season_snapshots for select
+  on public.badminton_season_snapshots for select
   to authenticated using (true);
 
 -- No insert/update/delete policies — only the SECURITY DEFINER
@@ -53,7 +53,7 @@ create policy "Snapshots readable by all"
 -- 2. reset_season()
 -- =========================================================================
 
-create or replace function public.reset_season()
+create or replace function public.badminton_reset_season()
 returns int
 language plpgsql
 security definer
@@ -67,7 +67,7 @@ declare
 begin
   -- Auth: caller must be an admin
   select is_admin, display_name into v_admin, v_admin_name
-    from public.profiles
+    from public.badminton_profiles
    where id = auth.uid();
   if not coalesce(v_admin, false) then
     raise exception 'Only admins can reset the season';
@@ -75,7 +75,7 @@ begin
 
   -- Current season is the row we're about to archive
   select coalesce(max(number), 1) into v_current_season
-    from public.seasons;
+    from public.badminton_seasons;
 
   v_next_season := v_current_season + 1;
 
@@ -89,7 +89,7 @@ begin
       row_number() over (
         order by singles_rating desc, singles_games_played desc
       )::int as rank
-      from public.profiles
+      from public.badminton_profiles
      where singles_games_played > 0
        and is_banned = false
   ),
@@ -98,11 +98,11 @@ begin
       row_number() over (
         order by doubles_rating desc, doubles_games_played desc
       )::int as rank
-      from public.profiles
+      from public.badminton_profiles
      where doubles_games_played > 0
        and is_banned = false
   )
-  insert into public.season_snapshots
+  insert into public.badminton_season_snapshots
     (user_id, season_number, singles_rating, doubles_rating,
      singles_games_played, doubles_games_played,
      singles_wins, doubles_wins,
@@ -118,7 +118,7 @@ begin
     coalesce(sw.doubles_wins, 0),
     sr.rank,
     dr.rank
-  from public.profiles p
+  from public.badminton_profiles p
   left join singles_ranked sr on sr.id = p.id
   left join doubles_ranked dr on dr.id = p.id
   left join lateral (
@@ -133,22 +133,22 @@ begin
          and ((mp.team = 'A' and m.score_a > m.score_b)
               or (mp.team = 'B' and m.score_b > m.score_a))
         then 1 else 0 end), 0)::int as doubles_wins
-    from public.match_participants mp
-    join public.matches m on m.id = mp.match_id
+    from public.badminton_match_participants mp
+    join public.badminton_matches m on m.id = mp.match_id
     where mp.user_id = p.id
       and m.status = 'confirmed'
       and m.played_at >= (
-        select started_at from public.seasons where number = v_current_season
+        select started_at from public.badminton_seasons where number = v_current_season
       )
   ) sw on true;
 
   -- Open the new season
-  insert into public.seasons (number, started_at)
+  insert into public.badminton_seasons (number, started_at)
   values (v_next_season, now());
 
   -- Reset every profile's season-state — including banned users (the
   -- is_banned flag itself is intentionally left untouched).
-  update public.profiles
+  update public.badminton_profiles
      set singles_rating = 1000,
          doubles_rating = 1000,
          singles_games_played = 0,
@@ -156,16 +156,16 @@ begin
 
   -- Stale match-derived announcements go; the season-reset moderation
   -- log line we insert below is kept (it has its own 30-day timer).
-  delete from public.chat_messages
+  delete from public.badminton_chat_messages
    where kind in ('system_streak', 'system_tier_up', 'system_streak_ended');
 
   -- Keep only the five most recent past seasons. Older snapshots are
   -- dropped so the Past Seasons Record list stays focused.
-  delete from public.season_snapshots
+  delete from public.badminton_season_snapshots
    where season_number <= v_current_season - 5;
 
   -- Drop the moderation log line announcing this reset.
-  insert into public.chat_messages
+  insert into public.badminton_chat_messages
     (kind, user_id, body, expires_at)
   values (
     'system_season_reset',
@@ -182,7 +182,7 @@ begin
   -- this raises at runtime — swallow it so a partial migration set
   -- can still reset seasons.
   begin
-    perform public.refresh_anonymous_rating();
+    perform public.badminton_refresh_anonymous_rating();
   exception when undefined_function then null;
   end;
 
@@ -190,23 +190,23 @@ begin
 end;
 $$;
 
-grant execute on function public.reset_season() to authenticated;
+grant execute on function public.badminton_reset_season() to authenticated;
 
 -- =========================================================================
 -- 3. Backfill peak ratings from any historical snapshots
 --
--- profiles.peak_X_rating defaults to 1000 and is bumped by settle_match
+-- badminton_profiles.peak_X_rating defaults to 1000 and is bumped by settle_match
 -- going forward. For prod that already has past-season snapshots with
 -- higher ratings, ratchet the peak from those rows once. Idempotent —
 -- subsequent runs are a no-op because greatest() is monotonic.
 -- =========================================================================
 
-update public.profiles p
+update public.badminton_profiles p
    set peak_singles_rating = greatest(
          p.peak_singles_rating,
          coalesce((
            select max(s.singles_rating)
-             from public.season_snapshots s
+             from public.badminton_season_snapshots s
             where s.user_id = p.id
          ), 0)
        ),
@@ -214,7 +214,7 @@ update public.profiles p
          p.peak_doubles_rating,
          coalesce((
            select max(s.doubles_rating)
-             from public.season_snapshots s
+             from public.badminton_season_snapshots s
             where s.user_id = p.id
          ), 0)
        );
@@ -223,7 +223,7 @@ update public.profiles p
 -- 4. Grant admin to khieng96@gmail.com (idempotent)
 -- =========================================================================
 
-update public.profiles
+update public.badminton_profiles
    set is_admin = true
  where id in (
    select id from auth.users where email = 'khieng96@gmail.com'

@@ -58,7 +58,7 @@ export async function fetchChatNotifications(
 ): Promise<ChatNotification[]> {
   const [mentionsRes, repliesRes, reactionsRes] = await Promise.all([
     supabase
-      .from('chat_messages')
+      .from('badminton_chat_messages')
       .select(
         'id, user_id, body, created_at, profiles:user_id(display_name, avatar_url)',
       )
@@ -69,7 +69,7 @@ export async function fetchChatNotifications(
       .order('created_at', { ascending: false })
       .limit(20),
     supabase
-      .from('chat_messages')
+      .from('badminton_chat_messages')
       .select(
         'id, user_id, body, created_at, reply_to_message_id, profiles:user_id(display_name, avatar_url), parent:reply_to_message_id!inner(user_id, kind)',
       )
@@ -80,7 +80,7 @@ export async function fetchChatNotifications(
       .order('created_at', { ascending: false })
       .limit(20),
     supabase
-      .from('chat_reactions')
+      .from('badminton_chat_reactions')
       .select(
         'message_id, user_id, emoji, created_at, profiles:user_id(display_name, avatar_url), msg:message_id!inner(user_id, kind, body)',
       )
@@ -142,7 +142,7 @@ export async function fetchChatNotifications(
 // fetches don't surface the same events again.
 export async function markNotificationsSeen(userId: string): Promise<void> {
   await supabase
-    .from('profiles')
+    .from('badminton_profiles')
     .update({ notifications_last_seen_at: new Date().toISOString() })
     .eq('id', userId);
 }

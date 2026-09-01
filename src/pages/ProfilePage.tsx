@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase';
 import { AvatarCropModal } from '../components/AvatarCropModal';
 import type { Database } from '../lib/database.types';
 
-type Profile = Database['public']['Tables']['profiles']['Row'];
+type Profile = Database['public']['Tables']['badminton_profiles']['Row'];
 
 export function ProfilePage() {
   const { user, signOut } = useAuth();
@@ -92,7 +92,7 @@ export function ProfilePage() {
     let active = true;
     setLoading(true);
     supabase
-      .from('profiles')
+      .from('badminton_profiles')
       .select('*')
       .eq('id', user.id)
       .maybeSingle()
@@ -103,7 +103,7 @@ export function ProfilePage() {
         setLoading(false);
       });
     supabase
-      .rpc('get_user_win_counts', { p_user_id: user.id })
+      .rpc('badminton_get_user_win_counts', { p_user_id: user.id })
       .then(({ data }) => {
         if (!active) return;
         const row = (data ?? [])[0] as
@@ -115,7 +115,7 @@ export function ProfilePage() {
         });
       });
     supabase
-      .from('season_snapshots')
+      .from('badminton_season_snapshots')
       .select(
         'season_number, archived_at, singles_rating, doubles_rating, singles_games_played, doubles_games_played, singles_wins, doubles_wins, singles_rank, doubles_rank',
       )
@@ -141,7 +141,7 @@ export function ProfilePage() {
     setSavingName(true);
     setError(null);
     const { data, error } = await supabase
-      .from('profiles')
+      .from('badminton_profiles')
       .update({ display_name: trimmed })
       .eq('id', user.id)
       .select()
@@ -170,7 +170,7 @@ export function ProfilePage() {
     try {
       const path = `${user.id}/avatar.jpg`;
       const { error: uploadErr } = await supabase.storage
-        .from('avatars')
+        .from('badminton_avatars')
         .upload(path, blob, {
           contentType: 'image/jpeg',
           upsert: true,
@@ -178,11 +178,11 @@ export function ProfilePage() {
         });
       if (uploadErr) throw uploadErr;
 
-      const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+      const { data: pub } = supabase.storage.from('badminton_avatars').getPublicUrl(path);
       const url = `${pub.publicUrl}?v=${Date.now()}`;
 
       const { data, error: updateErr } = await supabase
-        .from('profiles')
+        .from('badminton_profiles')
         .update({ avatar_url: url })
         .eq('id', user.id)
         .select()

@@ -122,7 +122,7 @@ export function AppShell() {
 
     async function refreshRoster() {
       const { data } = await supabase
-        .from('profiles')
+        .from('badminton_profiles')
         .select('id, display_name, avatar_url')
         .eq('is_banned', false)
         .eq('is_anonymous', false)

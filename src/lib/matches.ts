@@ -16,8 +16,8 @@ import {
 import { ANONYMOUS_ID } from './anonymous';
 import type { Confirmation, Database, MatchType, Team } from './database.types';
 
-type Profile = Database['public']['Tables']['profiles']['Row'];
-type Match = Database['public']['Tables']['matches']['Row'];
+type Profile = Database['public']['Tables']['badminton_profiles']['Row'];
+type Match = Database['public']['Tables']['badminton_matches']['Row'];
 
 export interface ParticipantSummary {
   user_id: string;
@@ -43,7 +43,7 @@ export async function searchPlayers(
     // Anonymous is excluded from regular search; PlayerPicker pins it
     // separately so it can be picked multiple times.
     let q = supabase
-      .from('profiles')
+      .from('badminton_profiles')
       .select('id, display_name, avatar_url')
       .eq('is_banned', false)
       .eq('is_anonymous', false)
@@ -138,7 +138,7 @@ export async function createMatch(input: CreateMatchInput): Promise<Match> {
   }
 
   const { data: match, error: matchErr } = await supabase
-    .from('matches')
+    .from('badminton_matches')
     .insert({
       match_type: matchType,
       created_by: creatorId,
@@ -175,10 +175,10 @@ export async function createMatch(input: CreateMatchInput): Promise<Match> {
     };
   });
 
-  const { error: partsErr } = await supabase.from('match_participants').insert(rows);
+  const { error: partsErr } = await supabase.from('badminton_match_participants').insert(rows);
   if (partsErr) {
     // Best-effort cleanup so we don't leave an orphan match
-    await supabase.from('matches').delete().eq('id', match.id);
+    await supabase.from('badminton_matches').delete().eq('id', match.id);
     throw partsErr;
   }
 
@@ -186,7 +186,7 @@ export async function createMatch(input: CreateMatchInput): Promise<Match> {
   // accepted server-side by the auto_accept_anonymous BEFORE INSERT
   // trigger, so we don't need to update those rows here.)
   const { error: ackErr } = await supabase
-    .from('match_participants')
+    .from('badminton_match_participants')
     .update({ confirmation: 'accepted', responded_at: new Date().toISOString() })
     .eq('match_id', match.id)
     .eq('user_id', creatorId);
@@ -299,7 +299,7 @@ export async function updateMatchOnlineOrQueue(
   };
 
   async function callRpc() {
-    const { error } = await supabase.rpc('update_pending_match', {
+    const { error } = await supabase.rpc('badminton_update_pending_match', {
       p_match_id: input.matchId,
       p_partner_id: input.partnerId,
       p_opponent_ids: input.opponentIds,
@@ -343,7 +343,7 @@ export async function flushPendingMatchEdits(): Promise<{
   let dropped = 0;
   for (const e of queue) {
     try {
-      const { error } = await supabase.rpc('update_pending_match', {
+      const { error } = await supabase.rpc('badminton_update_pending_match', {
         p_match_id: e.match_id,
         p_partner_id: e.partner_id,
         p_opponent_ids: e.opponent_ids,
@@ -373,7 +373,7 @@ export async function respondToMatch(
   decision: 'accepted' | 'rejected',
 ): Promise<void> {
   const { error } = await supabase
-    .from('match_participants')
+    .from('badminton_match_participants')
     .update({ confirmation: decision, responded_at: new Date().toISOString() })
     .eq('match_id', matchId)
     .eq('user_id', userId);
@@ -391,7 +391,7 @@ export interface MatchSummary {
 // All matches the current user is a participant in, newest first.
 export async function getMyMatches(userId: string, limit = 50): Promise<MatchSummary[]> {
   const { data: mine, error: e1 } = await supabase
-    .from('match_participants')
+    .from('badminton_match_participants')
     .select('match_id, team, confirmation, rating_delta')
     .eq('user_id', userId);
   if (e1) throw e1;
@@ -399,7 +399,7 @@ export async function getMyMatches(userId: string, limit = 50): Promise<MatchSum
 
   const matchIds = mine.map((m) => m.match_id);
   const { data: matches, error: e2 } = await supabase
-    .from('matches')
+    .from('badminton_matches')
     .select('*')
     .in('id', matchIds)
     .order('played_at', { ascending: false })
@@ -409,14 +409,14 @@ export async function getMyMatches(userId: string, limit = 50): Promise<MatchSum
 
   const liveIds = matches.map((m) => m.id);
   const { data: parts, error: e3 } = await supabase
-    .from('match_participants')
+    .from('badminton_match_participants')
     .select('match_id, user_id, team, confirmation')
     .in('match_id', liveIds);
   if (e3) throw e3;
 
   const userIds = Array.from(new Set((parts ?? []).map((p) => p.user_id)));
   const { data: profiles, error: e4 } = await supabase
-    .from('profiles')
+    .from('badminton_profiles')
     .select('id, display_name, avatar_url')
     .in('id', userIds);
   if (e4) throw e4;
@@ -449,7 +449,7 @@ export async function getMyMatches(userId: string, limit = 50): Promise<MatchSum
 // Matches where the current user has a pending confirmation.
 export async function getPendingForUser(userId: string): Promise<PendingMatchSummary[]> {
   const { data: myPending, error: e1 } = await supabase
-    .from('match_participants')
+    .from('badminton_match_participants')
     .select('match_id, team')
     .eq('user_id', userId)
     .eq('confirmation', 'pending');
@@ -459,7 +459,7 @@ export async function getPendingForUser(userId: string): Promise<PendingMatchSum
   const matchIds = myPending.map((p) => p.match_id);
 
   const { data: matches, error: e2 } = await supabase
-    .from('matches')
+    .from('badminton_matches')
     .select('*')
     .in('id', matchIds)
     .eq('status', 'pending');
@@ -469,14 +469,14 @@ export async function getPendingForUser(userId: string): Promise<PendingMatchSum
   const liveIds = matches.map((m) => m.id);
 
   const { data: parts, error: e3 } = await supabase
-    .from('match_participants')
+    .from('badminton_match_participants')
     .select('match_id, user_id, team, confirmation')
     .in('match_id', liveIds);
   if (e3) throw e3;
 
   const userIds = Array.from(new Set((parts ?? []).map((p) => p.user_id)));
   const { data: profiles, error: e4 } = await supabase
-    .from('profiles')
+    .from('badminton_profiles')
     .select('id, display_name, avatar_url')
     .in('id', userIds);
   if (e4) throw e4;

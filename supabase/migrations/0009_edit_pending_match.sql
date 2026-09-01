@@ -14,7 +14,7 @@
 --
 -- Safe to rerun.
 
-create or replace function public.update_pending_match(
+create or replace function public.badminton_update_pending_match(
   p_match_id uuid,
   p_partner_id uuid,                 -- nullable; pass NULL for singles
   p_opponent_ids uuid[],
@@ -29,7 +29,7 @@ declare
   m record;
   v_caller uuid := auth.uid();
 begin
-  select * into m from public.matches where id = p_match_id for update;
+  select * into m from public.badminton_matches where id = p_match_id for update;
   if not found then
     raise exception 'Match not found';
   end if;
@@ -44,7 +44,7 @@ begin
   -- silently invalidate someone else's prior acceptance of the old
   -- data.
   if exists (
-    select 1 from public.match_participants
+    select 1 from public.badminton_match_participants
      where match_id = p_match_id
        and user_id <> v_caller
        and confirmation = 'accepted'
@@ -89,25 +89,25 @@ begin
   end if;
 
   -- Apply: scores + participants
-  update public.matches
+  update public.badminton_matches
      set score_a = p_score_a,
          score_b = p_score_b
    where id = p_match_id;
 
-  delete from public.match_participants where match_id = p_match_id;
+  delete from public.badminton_match_participants where match_id = p_match_id;
 
-  insert into public.match_participants (match_id, user_id, team, confirmation)
+  insert into public.badminton_match_participants (match_id, user_id, team, confirmation)
   values (p_match_id, v_caller, 'A', 'accepted');
 
   if m.match_type = 'doubles' then
-    insert into public.match_participants (match_id, user_id, team, confirmation)
+    insert into public.badminton_match_participants (match_id, user_id, team, confirmation)
     values (p_match_id, p_partner_id, 'A', 'pending');
   end if;
 
-  insert into public.match_participants (match_id, user_id, team, confirmation)
+  insert into public.badminton_match_participants (match_id, user_id, team, confirmation)
   select p_match_id, opponent_id, 'B', 'pending'
     from unnest(p_opponent_ids) as opponent_id;
 end;
 $$;
 
-grant execute on function public.update_pending_match(uuid, uuid, uuid[], int, int) to authenticated;
+grant execute on function public.badminton_update_pending_match(uuid, uuid, uuid[], int, int) to authenticated;

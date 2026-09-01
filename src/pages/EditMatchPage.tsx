@@ -10,7 +10,7 @@ import { formatError } from '../lib/errors';
 import type { Database, MatchType, Team } from '../lib/database.types';
 
 type ProfileLite = Pick<
-  Database['public']['Tables']['profiles']['Row'],
+  Database['public']['Tables']['badminton_profiles']['Row'],
   'id' | 'display_name' | 'avatar_url'
 >;
 
@@ -37,7 +37,7 @@ export function EditMatchPage() {
 
     async function load() {
       const { data: match, error: mErr } = await supabase
-        .from('matches')
+        .from('badminton_matches')
         .select('id, match_type, created_by, status, score_a, score_b')
         .eq('id', matchId!)
         .maybeSingle();
@@ -66,7 +66,7 @@ export function EditMatchPage() {
       setMatchType(match.match_type as MatchType);
 
       const { data: parts } = await supabase
-        .from('match_participants')
+        .from('badminton_match_participants')
         .select(
           'user_id, team, confirmation, profiles:user_id(id, display_name, avatar_url)',
         )
@@ -122,7 +122,7 @@ export function EditMatchPage() {
           if (found) setPartner([found]);
           else {
             const { data: prof } = await supabase
-              .from('profiles')
+              .from('badminton_profiles')
               .select('id, display_name, avatar_url')
               .eq('id', queued.partner_id)
               .maybeSingle();
@@ -137,7 +137,7 @@ export function EditMatchPage() {
           const missing = queued.opponent_ids.filter((id) => !allKnown.has(id));
           if (missing.length > 0) {
             const { data: profs } = await supabase
-              .from('profiles')
+              .from('badminton_profiles')
               .select('id, display_name, avatar_url')
               .in('id', missing);
             for (const p of (profs ?? []) as ProfileLite[]) allKnown.set(p.id, p);

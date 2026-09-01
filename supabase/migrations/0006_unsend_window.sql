@@ -5,9 +5,9 @@
 --
 -- Tightens the existing 'Users can delete own chat messages' policy.
 
-drop policy if exists "Users can delete own chat messages" on public.chat_messages;
+drop policy if exists "Users can delete own chat messages" on public.badminton_chat_messages;
 create policy "Users can delete own chat messages"
-  on public.chat_messages for delete
+  on public.badminton_chat_messages for delete
   to authenticated
   using (
     kind = 'user'

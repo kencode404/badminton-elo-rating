@@ -3,7 +3,7 @@ import { searchPlayers } from '../lib/matches';
 import { ANONYMOUS_ID } from '../lib/anonymous';
 import type { Database } from '../lib/database.types';
 
-type ProfileLite = Pick<Database['public']['Tables']['profiles']['Row'], 'id' | 'display_name' | 'avatar_url'>;
+type ProfileLite = Pick<Database['public']['Tables']['badminton_profiles']['Row'], 'id' | 'display_name' | 'avatar_url'>;
 
 // Pinned chip representing the shared "Anonymous" player. Same id and
 // display_name across all uses; can fill multiple slots in one match

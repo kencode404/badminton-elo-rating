@@ -32,48 +32,48 @@
 -- 1. Columns
 -- =========================================================================
 
-alter table public.profiles
+alter table public.badminton_profiles
   add column if not exists shards int not null default 0
     check (shards >= 0);
 
 -- One armed shield slot per profile. Values: null | 'iron' | 'aura'.
 -- Consumed by _settle_match_elo on the first match where the player
 -- takes a rating loss; cleared on use. Wins keep it armed.
-alter table public.profiles
+alter table public.badminton_profiles
   add column if not exists armed_shield text;
 
 do $$ begin
-  alter table public.profiles
+  alter table public.badminton_profiles
     add constraint profiles_armed_shield_chk
     check (armed_shield is null or armed_shield in ('iron', 'aura'));
 exception when duplicate_object then null;
 end $$;
 
-alter table public.match_participants
+alter table public.badminton_match_participants
   add column if not exists shards_earned int not null default 0
     check (shards_earned >= 0);
 
--- Which shield (if any) absorbed this loss. Mirrors profiles.armed_shield
+-- Which shield (if any) absorbed this loss. Mirrors badminton_profiles.armed_shield
 -- values so the UI can render "Iron blocked 12 ELO" later.
-alter table public.match_participants
+alter table public.badminton_match_participants
   add column if not exists shield_consumed text;
 
 do $$ begin
-  alter table public.match_participants
+  alter table public.badminton_match_participants
     add constraint match_participants_shield_consumed_chk
     check (shield_consumed is null or shield_consumed in ('iron', 'aura'));
 exception when duplicate_object then null;
 end $$;
 
-create index if not exists profiles_shards_idx
-  on public.profiles (shards desc);
+create index if not exists badminton_profiles_shards_idx
+  on public.badminton_profiles (shards desc);
 
 -- =========================================================================
 -- 2. effective_tier_rank — placement-aware wrapper around tier_rank
 --    Placement players (< 5 games in mode) → 0 (below Bronze).
 -- =========================================================================
 
-create or replace function public.effective_tier_rank(
+create or replace function public.badminton_effective_tier_rank(
   p_rating int,
   p_games int
 ) returns int
@@ -82,11 +82,11 @@ immutable
 as $$
   select case
     when p_games < 5 then 0
-    else public.tier_rank(public.rating_to_tier_key(p_rating))
+    else public.badminton_tier_rank(public.badminton_rating_to_tier_key(p_rating))
   end;
 $$;
 
-grant execute on function public.effective_tier_rank(int, int) to authenticated;
+grant execute on function public.badminton_effective_tier_rank(int, int) to authenticated;
 
 -- =========================================================================
 -- 3. _settle_match_elo — extend with shard awards
@@ -97,7 +97,7 @@ grant execute on function public.effective_tier_rank(int, int) to authenticated;
 --          profile balance.
 -- =========================================================================
 
-create or replace function public._settle_match_elo(p_match_id uuid)
+create or replace function public.badminton__settle_match_elo(p_match_id uuid)
 returns void
 language plpgsql
 security definer
@@ -116,7 +116,7 @@ declare
   shards_win constant int := 5;
   shards_underdog constant int := 5;
   underdog_gap constant int := 2;
-  v_anon uuid := public.anonymous_user_id();
+  v_anon uuid := public.badminton_anonymous_user_id();
   v_shield text;
   v_raw_delta int;
   v_blocked_amount int;
@@ -139,13 +139,13 @@ declare
   delta int;
   score_diff int;
   margin_mult numeric;
-  winning_team match_team;
+  winning_team badminton_match_team;
   tier_avg_a numeric;
   tier_avg_b numeric;
   is_underdog_win boolean;
   shards_for_player int;
 begin
-  select * into m from public.matches where id = p_match_id for update;
+  select * into m from public.badminton_matches where id = p_match_id for update;
   if not found then
     return;
   end if;
@@ -163,17 +163,17 @@ begin
   -- Team mean ratings — anonymous's rating is included naturally.
   execute format(
     'select avg(p.%I)::numeric
-       from public.match_participants mp
-       join public.profiles p on p.id = mp.user_id
-      where mp.match_id = $1 and mp.team = $2::match_team',
+       from public.badminton_match_participants mp
+       join public.badminton_profiles p on p.id = mp.user_id
+      where mp.match_id = $1 and mp.team = $2::badminton_match_team',
     rating_col
   ) using p_match_id, 'A' into rating_a;
 
   execute format(
     'select avg(p.%I)::numeric
-       from public.match_participants mp
-       join public.profiles p on p.id = mp.user_id
-      where mp.match_id = $1 and mp.team = $2::match_team',
+       from public.badminton_match_participants mp
+       join public.badminton_profiles p on p.id = mp.user_id
+      where mp.match_id = $1 and mp.team = $2::badminton_match_team',
     rating_col
   ) using p_match_id, 'B' into rating_b;
 
@@ -198,19 +198,19 @@ begin
   -- it doesn't shift the gap. NULL if a team is all anonymous (in which
   -- case underdog can't be computed and the bonus simply doesn't fire).
   execute format(
-    'select avg(public.effective_tier_rank(p.%I, p.%I))::numeric
-       from public.match_participants mp
-       join public.profiles p on p.id = mp.user_id
-      where mp.match_id = $1 and mp.team = $2::match_team
+    'select avg(public.badminton_effective_tier_rank(p.%I, p.%I))::numeric
+       from public.badminton_match_participants mp
+       join public.badminton_profiles p on p.id = mp.user_id
+      where mp.match_id = $1 and mp.team = $2::badminton_match_team
         and mp.user_id <> $3',
     rating_col, games_col
   ) using p_match_id, 'A', v_anon into tier_avg_a;
 
   execute format(
-    'select avg(public.effective_tier_rank(p.%I, p.%I))::numeric
-       from public.match_participants mp
-       join public.profiles p on p.id = mp.user_id
-      where mp.match_id = $1 and mp.team = $2::match_team
+    'select avg(public.badminton_effective_tier_rank(p.%I, p.%I))::numeric
+       from public.badminton_match_participants mp
+       join public.badminton_profiles p on p.id = mp.user_id
+      where mp.match_id = $1 and mp.team = $2::badminton_match_team
         and mp.user_id <> $3',
     rating_col, games_col
   ) using p_match_id, 'B', v_anon into tier_avg_b;
@@ -228,14 +228,14 @@ begin
   -- delta=0, and shards_earned=0 — no payouts to a system account.
   for participant in
     select user_id, team, slot
-      from public.match_participants
+      from public.badminton_match_participants
      where match_id = p_match_id
   loop
-    execute format('select %I, %I from public.profiles where id = $1', rating_col, games_col)
+    execute format('select %I, %I from public.badminton_profiles where id = $1', rating_col, games_col)
       using participant.user_id into current_rating, current_games;
 
     if participant.user_id = v_anon then
-      update public.match_participants
+      update public.badminton_match_participants
          set rating_before = current_rating,
              rating_after = current_rating,
              rating_delta = 0,
@@ -271,7 +271,7 @@ begin
     -- match in the same batch can't double-spend it.
     if v_raw_delta < 0 then
       select armed_shield into v_shield
-        from public.profiles where id = participant.user_id;
+        from public.badminton_profiles where id = participant.user_id;
       if v_shield = 'iron' then
         delta := round(v_raw_delta::numeric / 2);
         v_blocked_amount := v_raw_delta - delta;  -- both negative; diff is the saved amount
@@ -291,7 +291,7 @@ begin
       shards_for_player := shards_play;
     end if;
 
-    update public.match_participants
+    update public.badminton_match_participants
        set rating_before = current_rating,
            rating_after = current_rating + delta,
            rating_delta = delta,
@@ -304,7 +304,7 @@ begin
     -- Apply rating + games + peak + shards + clear shield (if consumed).
     -- Clearing happens via case-when so non-consumed rows are untouched.
     execute format(
-      'update public.profiles
+      'update public.badminton_profiles
           set %I = %I + $1,
               %I = %I + 1,
               %I = greatest(%I, %I + $1),
@@ -320,12 +320,12 @@ begin
     perform v_blocked_amount;
   end loop;
 
-  update public.matches
+  update public.badminton_matches
      set status = 'confirmed', confirmed_at = now(), elo_version = 2
    where id = p_match_id;
 
   -- Anonymous's rating drifts with the club average.
-  perform public.refresh_anonymous_rating();
+  perform public.badminton_refresh_anonymous_rating();
 end;
 $$;
 
@@ -337,7 +337,7 @@ $$;
 --    buy twice.
 -- =========================================================================
 
-create or replace function public.buy_shield(p_kind text)
+create or replace function public.badminton_buy_shield(p_kind text)
 returns int
 language plpgsql
 security definer
@@ -353,7 +353,7 @@ begin
   if v_caller is null then
     raise exception 'Must be signed in';
   end if;
-  if v_caller = public.anonymous_user_id() then
+  if v_caller = public.badminton_anonymous_user_id() then
     raise exception 'Anonymous cannot buy';
   end if;
 
@@ -366,7 +366,7 @@ begin
   end if;
 
   select shards, armed_shield into v_current, v_armed
-    from public.profiles where id = v_caller for update;
+    from public.badminton_profiles where id = v_caller for update;
 
   if v_armed is not null then
     raise exception 'A shield is already armed';
@@ -375,7 +375,7 @@ begin
     raise exception 'Not enough shards (need %, have %)', v_cost, coalesce(v_current, 0);
   end if;
 
-  update public.profiles
+  update public.badminton_profiles
      set shards = shards - v_cost,
          armed_shield = p_kind
    where id = v_caller
@@ -385,4 +385,4 @@ begin
 end;
 $$;
 
-grant execute on function public.buy_shield(text) to authenticated;
+grant execute on function public.badminton_buy_shield(text) to authenticated;
