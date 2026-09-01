@@ -37,16 +37,21 @@ export default defineConfig({
       ],
       workbox: {
         // Runtime caching for Supabase reads + avatar images so users
-        // see their last-known data on weak / no signal. Mutations
-        // (POST/PATCH/DELETE) and Realtime subscriptions still need
-        // the network; only GETs to the REST endpoint are cached.
+        // see their last-known data on NO signal. Reads are NetworkFirst,
+        // not StaleWhileRevalidate: the latter answered every page load
+        // from a week-old cache first, so approved matches, reactions
+        // and pending lists kept reappearing until the background
+        // refresh landed. The cache is now only used when the network
+        // fails or takes > 4 s. Mutations (POST/PATCH/DELETE) and
+        // Realtime subscriptions still always need the network.
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
-            handler: 'StaleWhileRevalidate',
+            handler: 'NetworkFirst',
             method: 'GET',
             options: {
               cacheName: 'supabase-rest',
+              networkTimeoutSeconds: 4,
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 7, // 1 week
@@ -56,7 +61,7 @@ export default defineConfig({
           },
           {
             urlPattern:
-              /^https:\/\/.*\.supabase\.co\/storage\/v1\/object\/public\/avatars\/.*/i,
+              /^https:\/\/.*\.supabase\.co\/storage\/v1\/object\/public\/badminton_avatars\/.*/i,
             handler: 'CacheFirst',
             method: 'GET',
             options: {
